@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f0f0f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>締め切り管理</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- ========================================
+         ハンバーガーメニュー
+    ======================================== -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>メニュー</h2>
+            <button class="close-btn" id="closeSidebar" aria-label="メニューを閉じる">×</button>
+        </div>
+        <ul class="nav-list">
+            <li><a href="#" class="nav-item active" data-view="dashboard">
+                <span class="nav-icon">📋</span>ダッシュボード
+            </a></li>
+            <li><a href="#" class="nav-item" data-view="calendar">
+                <span class="nav-icon">📅</span>カレンダー
+            </a></li>
+            <li><a href="#" class="nav-item" data-view="routine">
+                <span class="nav-icon">🔄</span>ルーティーン管理
+            </a></li>
+        </ul>
+    </nav>
+    <div class="overlay" id="overlay"></div>
+
+    <!-- ========================================
+         ヘッダー
+    ======================================== -->
+    <header class="header">
+        <button class="menu-btn" id="menuBtn" aria-label="メニューを開く">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <h1 class="header-title" id="headerTitle">ダッシュボード</h1>
+        <div class="header-spacer"></div>
+    </header>
+
+    <!-- ========================================
+         メインコンテンツ
+    ======================================== -->
+    <main class="main-content">
+        <!-- ダッシュボード画面 -->
+        <section class="view active" id="dashboardView">
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <span class="stat-number" id="totalCount">0</span>
+                    <span class="stat-label">予定総数</span>
+                </div>
+                <div class="stat-item urgent">
+                    <span class="stat-number" id="urgentCount">0</span>
+                    <span class="stat-label">3日以内</span>
+                </div>
+                <div class="stat-item overdue">
+                    <span class="stat-number" id="overdueCount">0</span>
+                    <span class="stat-label">期限切れ</span>
+                </div>
+            </div>
+            
+            <div class="schedule-list" id="scheduleList">
+                <!-- 予定がここに動的に挿入される -->
+            </div>
+            
+            <div class="empty-state" id="emptyState">
+                <p>予定がありません</p>
+                <p class="empty-hint">カレンダーから予定を追加してください</p>
+            </div>
+        </section>
+
+        <!-- カレンダー画面 -->
+        <section class="view" id="calendarView">
+            <div class="calendar-container">
+                <div class="calendar-header">
+                    <button class="cal-nav-btn" id="prevMonth" aria-label="前月">◀</button>
+                    <h2 class="cal-month-year" id="calMonthYear">2025年1月</h2>
+                    <button class="cal-nav-btn" id="nextMonth" aria-label="次月">▶</button>
+                </div>
+                <div class="calendar-weekdays">
+                    <span class="weekday sun">日</span>
+                    <span class="weekday">月</span>
+                    <span class="weekday">火</span>
+                    <span class="weekday">水</span>
+                    <span class="weekday">木</span>
+                    <span class="weekday">金</span>
+                    <span class="weekday sat">土</span>
+                </div>
+                <div class="calendar-days" id="calendarDays">
+                    <!-- 日付がここに動的に挿入される -->
+                </div>
+            </div>
+            
+            <div class="selected-date-info" id="selectedDateInfo">
+                <h3 id="selectedDateTitle">日付を選択</h3>
+                <div class="date-schedules" id="dateSchedules"></div>
+                <button class="add-schedule-btn" id="addScheduleBtn">+ 予定を追加</button>
+            </div>
+        </section>
+
+        <!-- ルーティーン管理画面 -->
+        <section class="view" id="routineView">
+            <div class="routine-header">
+                <h2>ルーティーン一覧</h2>
+                <button class="add-routine-btn" id="addRoutineBtn">+ 追加</button>
+            </div>
+            <div class="routine-list" id="routineList">
+                <!-- ルーティーンがここに動的に挿入される -->
+            </div>
+            <div class="empty-state" id="routineEmptyState">
+                <p>ルーティーンがありません</p>
+                <p class="empty-hint">繰り返しの予定を追加してください</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- ========================================
+         予定追加モーダル
+    ======================================== -->
+    <div class="modal" id="scheduleModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">予定を追加</h3>
+                <button class="modal-close" id="closeScheduleModal">×</button>
+            </div>
+            <form id="scheduleForm">
+                <div class="form-group">
+                    <label for="scheduleTitle">タイトル *</label>
+                    <input type="text" id="scheduleTitle" required placeholder="予定のタイトル">
+                </div>
+                <div class="form-group">
+                    <label for="scheduleType">種別 *</label>
+                    <select id="scheduleType" required>
+                        <option value="assignment">課題</option>
+                        <option value="exam">試験</option>
+                        <option value="competition">大会</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="scheduleDate">日付 *</label>
+                    <input type="date" id="scheduleDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="scheduleMemo">メモ</label>
+                    <textarea id="scheduleMemo" placeholder="メモ（任意）" rows="3"></textarea>
+                </div>
+                <input type="hidden" id="scheduleId">
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" id="cancelSchedule">キャンセル</button>
+                    <button type="submit" class="btn-save">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================
+         ルーティーン追加モーダル
+    ======================================== -->
+    <div class="modal" id="routineModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="routineModalTitle">ルーティーンを追加</h3>
+                <button class="modal-close" id="closeRoutineModal">×</button>
+            </div>
+            <form id="routineForm">
+                <div class="form-group">
+                    <label for="routineTitle">タイトル *</label>
+                    <input type="text" id="routineTitle" required placeholder="ルーティーンのタイトル">
+                </div>
+                <div class="form-group">
+                    <label for="routineFrequency">繰り返し *</label>
+                    <select id="routineFrequency" required>
+                        <option value="daily">毎日</option>
+                        <option value="weekly">毎週</option>
+                    </select>
+                </div>
+                <div class="form-group weekday-group" id="weekdayGroup" style="display: none;">
+                    <label>曜日を選択</label>
+                    <div class="weekday-checkboxes">
+                        <label><input type="checkbox" value="0"> 日</label>
+                        <label><input type="checkbox" value="1"> 月</label>
+                        <label><input type="checkbox" value="2"> 火</label>
+                        <label><input type="checkbox" value="3"> 水</label>
+                        <label><input type="checkbox" value="4"> 木</label>
+                        <label><input type="checkbox" value="5"> 金</label>
+                        <label><input type="checkbox" value="6"> 土</label>
+                    </div>
+                </div>
+                <input type="hidden" id="routineId">
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" id="cancelRoutine">キャンセル</button>
+                    <button type="submit" class="btn-save">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================
+         削除確認モーダル
+    ======================================== -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3>確認</h3>
+            </div>
+            <p class="delete-message">この予定を削除しますか？</p>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" id="cancelDelete">キャンセル</button>
+                <button type="button" class="btn-delete" id="confirmDelete">削除</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="holidays.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,749 @@
+/**
+ * 締め切り管理アプリ - メインスクリプト
+ * 
+ * 構成:
+ * 1. 初期化・グローバル変数
+ * 2. ストレージ管理
+ * 3. UIユーティリティ
+ * 4. ダッシュボード機能
+ * 5. カレンダー機能
+ * 6. ルーティーン機能
+ * 7. モーダル管理
+ * 8. イベントリスナー
+ */
+
+// ========================================
+// 1. 初期化・グローバル変数
+// ========================================
+
+// データ保存用キー
+const STORAGE_KEYS = {
+    SCHEDULES: 'deadline_schedules',
+    ROUTINES: 'deadline_routines'
+};
+
+// 種別の日本語マッピング
+const TYPE_LABELS = {
+    assignment: '課題',
+    exam: '試験',
+    competition: '大会',
+    routine: 'ルーティーン'
+};
+
+// 現在表示中のカレンダー月
+let currentCalendarDate = new Date();
+
+// 選択中の日付
+let selectedDate = null;
+
+// 削除対象のID
+let deleteTarget = null;
+
+// ========================================
+// 2. ストレージ管理
+// ========================================
+
+/**
+ * localStorageからデータを取得
+ * @param {string} key - ストレージキー
+ * @returns {Array} データ配列
+ */
+function loadFromStorage(key) {
+    try {
+        const data = localStorage.getItem(key);
+        return data ? JSON.parse(data) : [];
+    } catch (e) {
+        console.error('Storage load error:', e);
+        return [];
+    }
+}
+
+/**
+ * localStorageにデータを保存
+ * @param {string} key - ストレージキー
+ * @param {Array} data - 保存するデータ
+ */
+function saveToStorage(key, data) {
+    try {
+        localStorage.setItem(key, JSON.stringify(data));
+    } catch (e) {
+        console.error('Storage save error:', e);
+    }
+}
+
+/**
+ * 予定データを取得
+ * @returns {Array} 予定配列
+ */
+function getSchedules() {
+    return loadFromStorage(STORAGE_KEYS.SCHEDULES);
+}
+
+/**
+ * 予定データを保存
+ * @param {Array} schedules - 予定配列
+ */
+function saveSchedules(schedules) {
+    saveToStorage(STORAGE_KEYS.SCHEDULES, schedules);
+}
+
+/**
+ * ルーティーンデータを取得
+ * @returns {Array} ルーティーン配列
+ */
+function getRoutines() {
+    return loadFromStorage(STORAGE_KEYS.ROUTINES);
+}
+
+/**
+ * ルーティーンデータを保存
+ * @param {Array} routines - ルーティーン配列
+ */
+function saveRoutines(routines) {
+    saveToStorage(STORAGE_KEYS.ROUTINES, routines);
+}
+
+// ========================================
+// 3. UIユーティリティ
+// ========================================
+
+/**
+ * 日付を表示用にフォーマット
+ * @param {string} dateStr - YYYY-MM-DD形式の日付
+ * @returns {string} フォーマット済み文字列
+ */
+function formatDateForDisplay(dateStr) {
+    const date = new Date(dateStr + 'T00:00:00');
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+    const weekday = weekdays[date.getDay()];
+    return `${month}/${day}(${weekday})`;
+}
+
+/**
+ * 残り日数を計算
+ * @param {string} dateStr - YYYY-MM-DD形式の日付
+ * @returns {number} 残り日数（負の値は期限切れ）
+ */
+function getDaysRemaining(dateStr) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(dateStr + 'T00:00:00');
+    const diff = target - today;
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * 残り日数を表示用テキストに変換
+ * @param {number} days - 残り日数
+ * @returns {object} { text: string, class: string }
+ */
+function getCountdownDisplay(days) {
+    if (days < 0) {
+        return { text: '期限切れ', class: 'countdown-overdue' };
+    } else if (days === 0) {
+        return { text: '今日', class: 'countdown-today' };
+    } else if (days <= 3) {
+        return { text: `あと${days}日`, class: 'countdown-urgent' };
+    } else {
+        return { text: `あと${days}日`, class: 'countdown-normal' };
+    }
+}
+
+/**
+ * 一意のIDを生成
+ * @returns {string} UUID形式のID
+ */
+function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+/**
+ * 今日の日付をYYYY-MM-DD形式で取得
+ * @returns {string}
+ */
+function getTodayString() {
+    return formatDateToString(new Date());
+}
+
+// ========================================
+// 4. ダッシュボード機能
+// ========================================
+
+/**
+ * ダッシュボードを更新
+ */
+function updateDashboard() {
+    const schedules = getSchedules();
+    const routines = getRoutines();
+    const todayStr = getTodayString();
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    
+    // 今日のルーティーンを予定として追加
+    const todayRoutines = routines
+        .filter(r => r.enabled)
+        .filter(r => {
+            if (r.frequency === 'daily') return true;
+            if (r.frequency === 'weekly' && r.weekdays.includes(dayOfWeek)) return true;
+            return false;
+        })
+        .map(r => ({
+            id: `routine_${r.id}`,
+            title: r.title,
+            type: 'routine',
+            date: todayStr,
+            isRoutine: true
+        }));
+    
+    // 全予定を結合（ルーティーンは今日のみ表示）
+    const allItems = [...schedules, ...todayRoutines];
+    
+    // 締め切り順にソート
+    const sortedItems = allItems.sort((a, b) => {
+        const daysA = getDaysRemaining(a.date);
+        const daysB = getDaysRemaining(b.date);
+        return daysA - daysB;
+    });
+    
+    // 統計を更新
+    updateStats(sortedItems);
+    
+    // リストを更新
+    renderScheduleList(sortedItems);
+}
+
+/**
+ * 統計バーを更新
+ * @param {Array} items - 予定配列
+ */
+function updateStats(items) {
+    const totalCount = items.length;
+    const urgentCount = items.filter(item => {
+        const days = getDaysRemaining(item.date);
+        return days >= 0 && days <= 3;
+    }).length;
+    const overdueCount = items.filter(item => getDaysRemaining(item.date) < 0).length;
+    
+    document.getElementById('totalCount').textContent = totalCount;
+    document.getElementById('urgentCount').textContent = urgentCount;
+    document.getElementById('overdueCount').textContent = overdueCount;
+}
+
+/**
+ * 予定リストを描画
+ * @param {Array} items - 予定配列
+ */
+function renderScheduleList(items) {
+    const listEl = document.getElementById('scheduleList');
+    const emptyEl = document.getElementById('emptyState');
+    
+    if (items.length === 0) {
+        listEl.style.display = 'none';
+        emptyEl.style.display = 'block';
+        return;
+    }
+    
+    listEl.style.display = 'flex';
+    emptyEl.style.display = 'none';
+    
+    listEl.innerHTML = items.map(item => {
+        const days = getDaysRemaining(item.date);
+        const countdown = getCountdownDisplay(days);
+        
+        let cardClass = 'schedule-card';
+        if (days < 0) cardClass += ' overdue';
+        else if (days === 0) cardClass += ' today';
+        else if (days <= 3) cardClass += ' urgent';
+        
+        const memoHtml = item.memo 
+            ? `<div class="schedule-memo">${escapeHtml(item.memo)}</div>` 
+            : '';
+        
+        const actionsHtml = item.isRoutine ? '' : `
+            <div class="schedule-actions">
+                <button class="action-btn edit" onclick="editSchedule('${item.id}')">編集</button>
+                <button class="action-btn delete" onclick="deleteScheduleConfirm('${item.id}')">削除</button>
+            </div>
+        `;
+        
+        return `
+            <div class="${cardClass}" data-type="${item.type}">
+                <div class="schedule-header">
+                    <span class="schedule-title">${escapeHtml(item.title)}</span>
+                    <span class="schedule-badge ${item.type}">${TYPE_LABELS[item.type]}</span>
+                </div>
+                <div class="schedule-info">
+                    <span class="schedule-date">${formatDateForDisplay(item.date)}</span>
+                    <span class="schedule-countdown ${countdown.class}">${countdown.text}</span>
+                </div>
+                ${memoHtml}
+                ${actionsHtml}
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * HTMLエスケープ
+ * @param {string} str - エスケープする文字列
+ * @returns {string} エスケープ済み文字列
+ */
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// ========================================
+// 5. カレンダー機能
+// ========================================
+
+/**
+ * カレンダーを描画
+ */
+function renderCalendar() {
+    const year = currentCalendarDate.getFullYear();
+    const month = currentCalendarDate.getMonth();
+    
+    // ヘッダー更新
+    document.getElementById('calMonthYear').textContent = `${year}年${month + 1}月`;
+    
+    // 月の最初と最後の日を取得
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    
+    const daysEl = document.getElementById('calendarDays');
+    daysEl.innerHTML = '';
+    
+    // 予定データを取得
+    const schedules = getSchedules();
+    
+    // 空白日を追加（月初の曜日まで）
+    for (let i = 0; i < firstDay.getDay(); i++) {
+        const emptyDay = document.createElement('div');
+        emptyDay.className = 'cal-day empty';
+        daysEl.appendChild(emptyDay);
+    }
+    
+    // 日付を追加
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    for (let day = 1; day <= lastDay.getDate(); day++) {
+        const date = new Date(year, month, day);
+        const dateStr = formatDateToString(date);
+        const dayOfWeek = date.getDay();
+        
+        const dayEl = document.createElement('div');
+        dayEl.className = 'cal-day';
+        dayEl.dataset.date = dateStr;
+        
+        // 曜日クラス
+        if (dayOfWeek === 0) dayEl.classList.add('sunday');
+        if (dayOfWeek === 6) dayEl.classList.add('saturday');
+        
+        // 今日かどうか
+        if (date.getTime() === today.getTime()) {
+            dayEl.classList.add('today');
+        }
+        
+        // 選択中かどうか
+        if (selectedDate === dateStr) {
+            dayEl.classList.add('selected');
+        }
+        
+        // 祝日チェック
+        const holiday = getHoliday(date);
+        if (holiday) {
+            dayEl.classList.add('holiday');
+        }
+        
+        // 日付テキスト
+        dayEl.textContent = day;
+        
+        // 予定があるかチェック
+        const hasSchedule = schedules.some(s => s.date === dateStr);
+        if (hasSchedule) {
+            const dot = document.createElement('span');
+            dot.className = 'has-schedule';
+            dayEl.appendChild(dot);
+        }
+        
+        // クリックイベント
+        dayEl.addEventListener('click', () => selectDate(dateStr));
+        
+        daysEl.appendChild(dayEl);
+    }
+}
+
+/**
+ * 日付を選択
+ * @param {string} dateStr - YYYY-MM-DD形式の日付
+ */
+function selectDate(dateStr) {
+    selectedDate = dateStr;
+    
+    // 選択状態を更新
+    document.querySelectorAll('.cal-day').forEach(el => {
+        el.classList.toggle('selected', el.dataset.date === dateStr);
+    });
+    
+    // 選択日の情報を表示
+    updateSelectedDateInfo(dateStr);
+}
+
+/**
+ * 選択日の情報を更新
+ * @param {string} dateStr - YYYY-MM-DD形式の日付
+ */
+function updateSelectedDateInfo(dateStr) {
+    const titleEl = document.getElementById('selectedDateTitle');
+    const schedulesEl = document.getElementById('dateSchedules');
+    
+    titleEl.textContent = formatDateForDisplay(dateStr);
+    
+    // 祝日を表示
+    const date = new Date(dateStr + 'T00:00:00');
+    const holiday = getHoliday(date);
+    if (holiday) {
+        titleEl.textContent += ` - ${holiday}`;
+    }
+    
+    // その日の予定を表示
+    const schedules = getSchedules().filter(s => s.date === dateStr);
+    
+    if (schedules.length === 0) {
+        schedulesEl.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 16px;">予定なし</p>';
+    } else {
+        schedulesEl.innerHTML = schedules.map(s => `
+            <div class="date-schedule-item">
+                <span>${escapeHtml(s.title)}</span>
+                <span class="schedule-badge ${s.type}">${TYPE_LABELS[s.type]}</span>
+            </div>
+        `).join('');
+    }
+}
+
+/**
+ * 前月に移動
+ */
+function goToPrevMonth() {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
+    renderCalendar();
+}
+
+/**
+ * 次月に移動
+ */
+function goToNextMonth() {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
+    renderCalendar();
+}
+
+// ========================================
+// 6. ルーティーン機能
+// ========================================
+
+/**
+ * ルーティーン一覧を描画
+ */
+function renderRoutineList() {
+    const routines = getRoutines();
+    const listEl = document.getElementById('routineList');
+    const emptyEl = document.getElementById('routineEmptyState');
+    
+    if (routines.length === 0) {
+        listEl.style.display = 'none';
+        emptyEl.style.display = 'block';
+        return;
+    }
+    
+    listEl.style.display = 'flex';
+    emptyEl.style.display = 'none';
+    
+    const weekdayNames = ['日', '月', '火', '水', '木', '金', '土'];
+    
+    listEl.innerHTML = routines.map(routine => {
+        let frequencyText = '';
+        if (routine.frequency === 'daily') {
+            frequencyText = '毎日';
+        } else if (routine.frequency === 'weekly') {
+            const days = routine.weekdays.map(d => weekdayNames[d]).join(', ');
+            frequencyText = `毎週 ${days}`;
+        }
+        
+        return `
+            <div class="routine-card ${routine.enabled ? '' : 'disabled'}">
+                <div class="routine-top">
+                    <span class="routine-title">${escapeHtml(routine.title)}</span>
+                    <button class="routine-toggle ${routine.enabled ? 'active' : ''}" 
+                            onclick="toggleRoutine('${routine.id}')" 
+                            aria-label="ルーティーンの有効/無効を切り替え"></button>
+                </div>
+                <div class="routine-info">${frequencyText}</div>
+                <div class="routine-actions">
+                    <button class="action-btn edit" onclick="editRoutine('${routine.id}')">編集</button>
+                    <button class="action-btn delete" onclick="deleteRoutineConfirm('${routine.id}')">削除</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * ルーティーンの有効/無効を切り替え
+ * @param {string} id - ルーティーンID
+ */
+function toggleRoutine(id) {
+    const routines = getRoutines();
+    const index = routines.findIndex(r => r.id === id);
+    if (index !== -1) {
+        routines[index].enabled = !routines[index].enabled;
+        saveRoutines(routines);
+        renderRoutineList();
+        updateDashboard();
+    }
+}
+
+// ========================================
+// 7. モーダル管理
+// ========================================
+
+/**
+ * 予定追加モーダルを開く
+ */
+function openScheduleModal(editId = null) {
+    const modal = document.getElementById('scheduleModal');
+    const form = document.getElementById('scheduleForm');
+    const title = document.getElementById('modalTitle');
+    
+    form.reset();
+    document.getElementById('scheduleId').value = '';
+    
+    if (editId) {
+        // 編集モード
+        title.textContent = '予定を編集';
+        const schedules = getSchedules();
+        const schedule = schedules.find(s => s.id === editId);
+        if (schedule) {
+            document.getElementById('scheduleId').value = schedule.id;
+            document.getElementById('scheduleTitle').value = schedule.title;
+            document.getElementById('scheduleType').value = schedule.type;
+            document.getElementById('scheduleDate').value = schedule.date;
+            document.getElementById('scheduleMemo').value = schedule.memo || '';
+        }
+    } else {
+        // 新規追加モード
+        title.textContent = '予定を追加';
+        // 選択中の日付があればセット
+        if (selectedDate) {
+            document.getElementById('scheduleDate').value = selectedDate;
+        } else {
+            document.getElementById('scheduleDate').value = getTodayString();
+        }
+    }
+    
+    modal.classList.add('active');
+}
+
+/**
+ * 予定モーダルを閉じる
+ */
+function closeScheduleModal() {
+    document.getElementById('scheduleModal').classList.remove('active');
+}
+
+/**
+ * 予定を保存
+ * @param {Event} e - フォームイベント
+ */
+function saveSchedule(e) {
+    e.preventDefault();
+    
+    const id = document.getElementById('scheduleId').value;
+    const title = document.getElementById('scheduleTitle').value.trim();
+    const type = document.getElementById('scheduleType').value;
+    const date = document.getElementById('scheduleDate').value;
+    const memo = document.getElementById('scheduleMemo').value.trim();
+    
+    if (!title || !type || !date) return;
+    
+    const schedules = getSchedules();
+    
+    if (id) {
+        // 更新
+        const index = schedules.findIndex(s => s.id === id);
+        if (index !== -1) {
+            schedules[index] = { ...schedules[index], title, type, date, memo };
+        }
+    } else {
+        // 新規追加
+        schedules.push({
+            id: generateId(),
+            title,
+            type,
+            date,
+            memo
+        });
+    }
+    
+    saveSchedules(schedules);
+    closeScheduleModal();
+    updateDashboard();
+    renderCalendar();
+    
+    if (selectedDate) {
+        updateSelectedDateInfo(selectedDate);
+    }
+}
+
+/**
+ * 予定を編集
+ * @param {string} id - 予定ID
+ */
+function editSchedule(id) {
+    openScheduleModal(id);
+}
+
+/**
+ * 予定削除確認
+ * @param {string} id - 予定ID
+ */
+function deleteScheduleConfirm(id) {
+    deleteTarget = { type: 'schedule', id };
+    document.getElementById('deleteModal').classList.add('active');
+}
+
+/**
+ * ルーティーン追加モーダルを開く
+ */
+function openRoutineModal(editId = null) {
+    const modal = document.getElementById('routineModal');
+    const form = document.getElementById('routineForm');
+    const title = document.getElementById('routineModalTitle');
+    
+    form.reset();
+    document.getElementById('routineId').value = '';
+    document.getElementById('weekdayGroup').style.display = 'none';
+    
+    // チェックボックスをリセット
+    document.querySelectorAll('#weekdayGroup input[type="checkbox"]').forEach(cb => {
+        cb.checked = false;
+    });
+    
+    if (editId) {
+        // 編集モード
+        title.textContent = 'ルーティーンを編集';
+        const routines = getRoutines();
+        const routine = routines.find(r => r.id === editId);
+        if (routine) {
+            document.getElementById('routineId').value = routine.id;
+            document.getElementById('routineTitle').value = routine.title;
+            document.getElementById('routineFrequency').value = routine.frequency;
+            
+            if (routine.frequency === 'weekly') {
+                document.getElementById('weekdayGroup').style.display = 'block';
+                routine.weekdays.forEach(day => {
+                    const cb = document.querySelector(`#weekdayGroup input[value="${day}"]`);
+                    if (cb) cb.checked = true;
+                });
+            }
+        }
+    } else {
+        title.textContent = 'ルーティーンを追加';
+    }
+    
+    modal.classList.add('active');
+}
+
+/**
+ * ルーティーンモーダルを閉じる
+ */
+function closeRoutineModal() {
+    document.getElementById('routineModal').classList.remove('active');
+}
+
+/**
+ * ルーティーンを保存
+ * @param {Event} e - フォームイベント
+ */
+function saveRoutine(e) {
+    e.preventDefault();
+    
+    const id = document.getElementById('routineId').value;
+    const title = document.getElementById('routineTitle').value.trim();
+    const frequency = document.getElementById('routineFrequency').value;
+    
+    if (!title || !frequency) return;
+    
+    let weekdays = [];
+    if (frequency === 'weekly') {
+        document.querySelectorAll('#weekdayGroup input[type="checkbox"]:checked').forEach(cb => {
+            weekdays.push(parseInt(cb.value));
+        });
+        
+        if (weekdays.length === 0) {
+            alert('曜日を1つ以上選択してください');
+            return;
+        }
+    }
+    
+    const routines = getRoutines();
+    
+    if (id) {
+        // 更新
+        const index = routines.findIndex(r => r.id === id);
+        if (index !== -1) {
+            routines[index] = { 
+                ...routines[index], 
+                title, 
+                frequency, 
+                weekdays 
+            };
+        }
+    } else {
+        // 新規追加
+        routines.push({
+            id: generateId(),
+            title,
+            frequency,
+            weekdays,
+            enabled: true
+        });
+    }
+    
+    saveRoutines(routines);
+    closeRoutineModal();
+    renderRoutineList();
+    updateDashboard();
+}
+
+/**
+ * ルーティーンを編集
+ * @param {string} id - ルーティーンID
+ */
+function editRoutine(id) {
+    openRoutineModal(id);
+}
+
+/**
+ * ルーティーン削除確認
+ * @param {string} id - ルーティーンID
+ */
+function deleteRoutineConfirm(id) {
+    deleteTarget = { type: 'routine', id };
+    document.getElementById('deleteModal').classList.add('active');
+}
+
+/**
+ * 削除を実行
+ */
+function confirmDelete() {
+    if (!deleteTarget) return;
+    
+    if (deleteTarget.type === 'schedule') {
+        const schedules = getSchedules().filter(s => s.id !== deleteTarget.id);
+        save

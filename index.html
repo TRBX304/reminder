@@ -82,6 +82,12 @@
                 <p>予定がありません</p>
                 <p class="empty-hint">カレンダーから予定を追加してください</p>
             </div>
+            
+            <!-- ダッシュボードのTODOセクション -->
+            <div class="dashboard-todo-section" id="dashboardTodoSection">
+                <h3 class="section-title">📝 TODO</h3>
+                <div class="dashboard-todo-list" id="dashboardTodoList"></div>
+            </div>
         </section>
 
         <!-- カレンダー画面 -->
@@ -153,9 +159,14 @@
         <section class="view" id="memoView">
             <div class="memo-header">
                 <h2>メモ帳</h2>
+                <button class="add-memo-btn" id="addMemoBtn">+ 新規メモ</button>
             </div>
-            <textarea id="memoTextarea" placeholder="メモを入力..."></textarea>
-            <div class="memo-status" id="memoStatus">保存済み</div>
+            <div class="memo-list" id="memoList">
+                <!-- メモがここに動的に挿入される -->
+            </div>
+            <div class="empty-state" id="memoEmptyState">
+                <p>メモがありません</p>
+            </div>
         </section>
     </main>
 
@@ -245,6 +256,33 @@
                 <button type="button" class="btn-cancel" id="cancelDelete">キャンセル</button>
                 <button type="button" class="btn-delete" id="confirmDelete">削除</button>
             </div>
+        </div>
+    </div>
+
+    <!-- ========================================
+         メモ編集モーダル
+    ======================================== -->
+    <div class="modal" id="memoModal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="memoModalTitle">メモを追加</h3>
+                <button class="modal-close" id="closeMemoModal">×</button>
+            </div>
+            <form id="memoForm">
+                <div class="form-group">
+                    <label for="memoTitle">題名 *</label>
+                    <input type="text" id="memoTitle" required placeholder="メモの題名">
+                </div>
+                <div class="form-group">
+                    <label for="memoContent">内容</label>
+                    <textarea id="memoContent" placeholder="メモの内容..." rows="10"></textarea>
+                </div>
+                <input type="hidden" id="memoId">
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" id="cancelMemo">キャンセル</button>
+                    <button type="submit" class="btn-save">保存</button>
+                </div>
+            </form>
         </div>
     </div>
 

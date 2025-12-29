@@ -746,4 +746,123 @@ function confirmDelete() {
     
     if (deleteTarget.type === 'schedule') {
         const schedules = getSchedules().filter(s => s.id !== deleteTarget.id);
-        save
+        saveSchedules(schedules);
+        updateDashboard();
+        renderCalendar();
+        if (selectedDate) {
+            updateSelectedDateInfo(selectedDate);
+        }
+    } else if (deleteTarget.type === 'routine') {
+        const routines = getRoutines().filter(r => r.id !== deleteTarget.id);
+        saveRoutines(routines);
+        renderRoutineList();
+        updateDashboard();
+    }
+    
+    closeDeleteModal();
+}
+
+/**
+ * 削除モーダルを閉じる
+ */
+function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.remove('active');
+    deleteTarget = null;
+}
+
+// ========================================
+// 8. イベントリスナー
+// ========================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Service Worker登録
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('Service Worker registered'))
+            .catch(err => console.error('Service Worker registration failed:', err));
+    }
+    
+    // 初期表示
+    updateDashboard();
+    renderCalendar();
+    renderRoutineList();
+    
+    // サイドバートグル
+    const menuBtn = document.getElementById('menuBtn');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('overlay');
+    const closeSidebar = document.getElementById('closeSidebar');
+    
+    menuBtn.addEventListener('click', () => {
+        sidebar.classList.add('open');
+        overlay.classList.add('active');
+    });
+    
+    const closeSidebarFn = () => {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('active');
+    };
+    
+    closeSidebar.addEventListener('click', closeSidebarFn);
+    overlay.addEventListener('click', closeSidebarFn);
+    
+    // ナビゲーション
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const view = item.dataset.view;
+            
+            // アクティブ状態を更新
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+            
+            // ビューを切り替え
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(`${view}View`).classList.add('active');
+            
+            // ヘッダータイトルを更新
+            const titles = {
+                dashboard: 'ダッシュボード',
+                calendar: 'カレンダー',
+                routine: 'ルーティーン管理'
+            };
+            document.getElementById('headerTitle').textContent = titles[view];
+            
+            closeSidebarFn();
+        });
+    });
+    
+    // カレンダーナビゲーション
+    document.getElementById('prevMonth').addEventListener('click', goToPrevMonth);
+    document.getElementById('nextMonth').addEventListener('click', goToNextMonth);
+    
+    // 予定追加ボタン
+    document.getElementById('addScheduleBtn').addEventListener('click', () => {
+        openScheduleModal();
+    });
+    
+    // 予定モーダル
+    document.getElementById('closeScheduleModal').addEventListener('click', closeScheduleModal);
+    document.getElementById('cancelSchedule').addEventListener('click', closeScheduleModal);
+    document.getElementById('scheduleForm').addEventListener('submit', saveSchedule);
+    
+    // ルーティーン追加ボタン
+    document.getElementById('addRoutineBtn').addEventListener('click', () => {
+        openRoutineModal();
+    });
+    
+    // ルーティーンモーダル
+    document.getElementById('closeRoutineModal').addEventListener('click', closeRoutineModal);
+    document.getElementById('cancelRoutine').addEventListener('click', closeRoutineModal);
+    document.getElementById('routineForm').addEventListener('submit', saveRoutine);
+    
+    // 繰り返し選択で曜日表示切替
+    document.getElementById('routineFrequency').addEventListener('change', (e) => {
+        document.getElementById('weekdayGroup').style.display = 
+            e.target.value === 'weekly' ? 'block' : 'none';
+    });
+    
+    // 削除モーダル
+    document.getElementById('cancelDelete').addEventListener('click', closeDeleteModal);
+    document.getElementById('confirmDelete').addEventListener('click', confirmDelete);
+});

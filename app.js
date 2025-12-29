@@ -264,8 +264,14 @@ function updateDashboard() {
             isRoutine: true
         }));
     
+    // 統計は全予定で計算（期限切れも含む）
+    updateStats(schedules);
+    
+    // リスト表示は期限切れを除外
+    const validSchedules = schedules.filter(s => getDaysRemaining(s.date) >= 0);
+    
     // 全予定を結合（ルーティーンは今日のみ表示）
-    const allItems = [...schedules, ...todayRoutines];
+    const allItems = [...validSchedules, ...todayRoutines];
     
     // 締め切り順にソート
     const sortedItems = allItems.sort((a, b) => {
@@ -274,24 +280,21 @@ function updateDashboard() {
         return daysA - daysB;
     });
     
-    // 統計を更新
-    updateStats(sortedItems);
-    
     // リストを更新
     renderScheduleList(sortedItems);
 }
 
 /**
  * 統計バーを更新
- * @param {Array} items - 予定配列
+ * @param {Array} schedules - 全予定配列
  */
-function updateStats(items) {
-    const totalCount = items.length;
-    const urgentCount = items.filter(item => {
+function updateStats(schedules) {
+    const totalCount = schedules.length;
+    const urgentCount = schedules.filter(item => {
         const days = getDaysRemaining(item.date);
         return days >= 0 && days <= 3;
     }).length;
-    const overdueCount = items.filter(item => getDaysRemaining(item.date) < 0).length;
+    const overdueCount = schedules.filter(item => getDaysRemaining(item.date) < 0).length;
     
     document.getElementById('totalCount').textContent = totalCount;
     document.getElementById('urgentCount').textContent = urgentCount;
@@ -374,8 +377,8 @@ function renderDashboardTodos() {
     const sectionEl = document.getElementById('dashboardTodoSection');
     const listEl = document.getElementById('dashboardTodoList');
     
-    // 未完了のTODOのみ表示（最大5件）
-    const incompleteTodos = todos.filter(t => !t.completed).slice(0, 5);
+    // 未完了のTODOのみ表示（最大10件）
+    const incompleteTodos = todos.filter(t => !t.completed).slice(0, 10);
     
     if (incompleteTodos.length === 0 && todos.length === 0) {
         sectionEl.style.display = 'none';

@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>締め切り管理</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -27,8 +27,14 @@
             <li><a href="#" class="nav-item" data-view="calendar">
                 <span class="nav-icon">📅</span>カレンダー
             </a></li>
+            <li><a href="#" class="nav-item" data-view="todo">
+                <span class="nav-icon">✅</span>TODOリスト
+            </a></li>
             <li><a href="#" class="nav-item" data-view="routine">
                 <span class="nav-icon">🔄</span>ルーティーン管理
+            </a></li>
+            <li><a href="#" class="nav-item" data-view="memo">
+                <span class="nav-icon">📝</span>メモ帳
             </a></li>
         </ul>
     </nav>
@@ -113,6 +119,10 @@
                 <h2>ルーティーン一覧</h2>
                 <button class="add-routine-btn" id="addRoutineBtn">+ 追加</button>
             </div>
+            <div class="today-routines" id="todayRoutines">
+                <h3>今日のルーティーン</h3>
+                <div class="today-routine-list" id="todayRoutineList"></div>
+            </div>
             <div class="routine-list" id="routineList">
                 <!-- ルーティーンがここに動的に挿入される -->
             </div>
@@ -120,6 +130,32 @@
                 <p>ルーティーンがありません</p>
                 <p class="empty-hint">繰り返しの予定を追加してください</p>
             </div>
+        </section>
+
+        <!-- TODOリスト画面 -->
+        <section class="view" id="todoView">
+            <div class="todo-header">
+                <h2>TODOリスト</h2>
+            </div>
+            <div class="todo-input-area">
+                <input type="text" id="todoInput" placeholder="新しいTODOを入力...">
+                <button class="add-todo-btn" id="addTodoBtn">追加</button>
+            </div>
+            <div class="todo-list" id="todoList">
+                <!-- TODOがここに動的に挿入される -->
+            </div>
+            <div class="empty-state" id="todoEmptyState">
+                <p>TODOがありません</p>
+            </div>
+        </section>
+
+        <!-- メモ帳画面 -->
+        <section class="view" id="memoView">
+            <div class="memo-header">
+                <h2>メモ帳</h2>
+            </div>
+            <textarea id="memoTextarea" placeholder="メモを入力..."></textarea>
+            <div class="memo-status" id="memoStatus">保存済み</div>
         </section>
     </main>
 
@@ -136,14 +172,6 @@
                 <div class="form-group">
                     <label for="scheduleTitle">タイトル *</label>
                     <input type="text" id="scheduleTitle" required placeholder="予定のタイトル">
-                </div>
-                <div class="form-group">
-                    <label for="scheduleType">種別 *</label>
-                    <select id="scheduleType" required>
-                        <option value="assignment">課題</option>
-                        <option value="exam">試験</option>
-                        <option value="competition">大会</option>
-                    </select>
                 </div>
                 <div class="form-group">
                     <label for="scheduleDate">日付 *</label>

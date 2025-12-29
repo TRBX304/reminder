@@ -21,7 +21,7 @@ const STORAGE_KEYS = {
     SCHEDULES: 'deadline_schedules',
     ROUTINES: 'deadline_routines',
     TODOS: 'deadline_todos',
-    MEMO: 'deadline_memo',
+    MEMOS: 'deadline_memos',
     ROUTINE_CHECKS: 'deadline_routine_checks'
 };
 
@@ -116,26 +116,18 @@ function saveTodos(todos) {
 
 /**
  * メモデータを取得
- * @returns {string} メモ文字列
+ * @returns {Array} メモ配列
  */
-function getMemo() {
-    try {
-        return localStorage.getItem(STORAGE_KEYS.MEMO) || '';
-    } catch (e) {
-        return '';
-    }
+function getMemos() {
+    return loadFromStorage(STORAGE_KEYS.MEMOS);
 }
 
 /**
  * メモデータを保存
- * @param {string} memo - メモ文字列
+ * @param {Array} memos - メモ配列
  */
-function saveMemo(memo) {
-    try {
-        localStorage.setItem(STORAGE_KEYS.MEMO, memo);
-    } catch (e) {
-        console.error('Memo save error:', e);
-    }
+function saveMemos(memos) {
+    saveToStorage(STORAGE_KEYS.MEMOS, memos);
 }
 
 /**
@@ -317,49 +309,93 @@ function renderScheduleList(items) {
     if (items.length === 0) {
         listEl.style.display = 'none';
         emptyEl.style.display = 'block';
+    } else {
+        listEl.style.display = 'flex';
+        emptyEl.style.display = 'none';
+        
+        listEl.innerHTML = items.map(item => {
+            const days = getDaysRemaining(item.date);
+            const countdown = getCountdownDisplayNew(days);
+            
+            let cardClass = 'schedule-card';
+            if (days < 0) cardClass += ' overdue';
+            else if (days === 0) cardClass += ' today';
+            else if (days <= 3) cardClass += ' urgent';
+            
+            const memoHtml = item.memo 
+                ? `<div class="schedule-memo">${escapeHtml(item.memo)}</div>` 
+                : '';
+            
+            const routineBadge = item.isRoutine ? '<span class="schedule-badge routine">ルーティーン</span>' : '';
+            
+            return `
+                <div class="${cardClass}">
+                    <div class="schedule-countdown-box ${countdown.class}">
+                        <span class="countdown-number">${countdown.number}</span>
+                        <span class="countdown-label">${countdown.label}</span>
+                    </div>
+                    <div class="schedule-content">
+                        <div class="schedule-title">${escapeHtml(item.title)}</div>
+                        <div class="schedule-date">${formatDateForDisplay(item.date)}</div>
+                        ${memoHtml}
+                    </div>
+                    ${routineBadge}
+                </div>
+            `;
+        }).join('');
+    }
+    
+    // ダッシュボードのTODOセクションも更新
+    renderDashboardTodos();
+}
+
+/**
+ * カウントダウン表示（新デザイン用）
+ * @param {number} days - 残り日数
+ * @returns {object} { number, label, class }
+ */
+function getCountdownDisplayNew(days) {
+    if (days < 0) {
+        return { number: Math.abs(days), label: '日超過', class: 'countdown-overdue' };
+    } else if (days === 0) {
+        return { number: '!', label: '今日', class: 'countdown-today' };
+    } else if (days <= 3) {
+        return { number: days, label: '日後', class: 'countdown-urgent' };
+    } else {
+        return { number: days, label: '日後', class: 'countdown-normal' };
+    }
+}
+
+/**
+ * ダッシュボードのTODOを描画
+ */
+function renderDashboardTodos() {
+    const todos = getTodos();
+    const sectionEl = document.getElementById('dashboardTodoSection');
+    const listEl = document.getElementById('dashboardTodoList');
+    
+    // 未完了のTODOのみ表示（最大5件）
+    const incompleteTodos = todos.filter(t => !t.completed).slice(0, 5);
+    
+    if (incompleteTodos.length === 0 && todos.length === 0) {
+        sectionEl.style.display = 'none';
         return;
     }
     
-    listEl.style.display = 'flex';
-    emptyEl.style.display = 'none';
+    sectionEl.style.display = 'block';
     
-    listEl.innerHTML = items.map(item => {
-        const days = getDaysRemaining(item.date);
-        const countdown = getCountdownDisplay(days);
-        
-        let cardClass = 'schedule-card';
-        if (days < 0) cardClass += ' overdue';
-        else if (days === 0) cardClass += ' today';
-        else if (days <= 3) cardClass += ' urgent';
-        
-        const memoHtml = item.memo 
-            ? `<div class="schedule-memo">${escapeHtml(item.memo)}</div>` 
-            : '';
-        
-        const actionsHtml = item.isRoutine ? '' : `
-            <div class="schedule-actions">
-                <button class="action-btn edit" onclick="editSchedule('${item.id}')">編集</button>
-                <button class="action-btn delete" onclick="deleteScheduleConfirm('${item.id}')">削除</button>
-            </div>
-        `;
-        
-        const routineBadge = item.isRoutine ? '<span class="schedule-badge routine">ルーティーン</span>' : '';
-        
-        return `
-            <div class="${cardClass}">
-                <div class="schedule-header">
-                    <span class="schedule-title">${escapeHtml(item.title)}</span>
-                    ${routineBadge}
-                </div>
-                <div class="schedule-info">
-                    <span class="schedule-date">${formatDateForDisplay(item.date)}</span>
-                    <span class="schedule-countdown ${countdown.class}">${countdown.text}</span>
-                </div>
-                ${memoHtml}
-                ${actionsHtml}
-            </div>
-        `;
-    }).join('');
+    if (incompleteTodos.length === 0) {
+        listEl.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 8px;">すべて完了！</p>';
+        return;
+    }
+    
+    listEl.innerHTML = incompleteTodos.map(todo => `
+        <div class="dashboard-todo-item ${todo.completed ? 'completed' : ''}">
+            <div class="todo-checkbox ${todo.completed ? 'checked' : ''}" 
+                 onclick="toggleTodo('${todo.id}')"></div>
+            <span class="dashboard-todo-text">${escapeHtml(todo.text)}</span>
+        </div>
+    `).join('');
 }
 
 /**
@@ -719,6 +755,7 @@ function toggleTodo(id) {
         todos[index].completed = !todos[index].completed;
         saveTodos(todos);
         renderTodoList();
+        renderDashboardTodos();
     }
 }
 
@@ -730,6 +767,7 @@ function deleteTodo(id) {
     const todos = getTodos().filter(t => t.id !== id);
     saveTodos(todos);
     renderTodoList();
+    renderDashboardTodos();
 }
 
 // ========================================
@@ -737,27 +775,121 @@ function deleteTodo(id) {
 // ========================================
 
 /**
- * メモを初期化
+ * メモリストを描画
  */
-function initMemo() {
-    const textarea = document.getElementById('memoTextarea');
-    const statusEl = document.getElementById('memoStatus');
+function renderMemoList() {
+    const memos = getMemos();
+    const listEl = document.getElementById('memoList');
+    const emptyEl = document.getElementById('memoEmptyState');
     
-    // 保存されているメモを読み込み
-    textarea.value = getMemo();
+    if (memos.length === 0) {
+        listEl.style.display = 'none';
+        emptyEl.style.display = 'block';
+        return;
+    }
     
-    let saveTimeout;
+    listEl.style.display = 'flex';
+    emptyEl.style.display = 'none';
     
-    // 入力時に自動保存
-    textarea.addEventListener('input', () => {
-        statusEl.textContent = '保存中...';
+    // 更新日順（新しい順）
+    const sortedMemos = [...memos].sort((a, b) => 
+        new Date(b.updatedAt) - new Date(a.updatedAt)
+    );
+    
+    listEl.innerHTML = sortedMemos.map(memo => {
+        const date = new Date(memo.updatedAt);
+        const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+        const preview = memo.content ? memo.content.substring(0, 100) : '（内容なし）';
         
-        clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(() => {
-            saveMemo(textarea.value);
-            statusEl.textContent = '保存済み';
-        }, 500);
-    });
+        return `
+            <div class="memo-card" onclick="openMemoModal('${memo.id}')">
+                <div class="memo-card-title">${escapeHtml(memo.title)}</div>
+                <div class="memo-card-preview">${escapeHtml(preview)}</div>
+                <div class="memo-card-date">${dateStr}</div>
+                <div class="memo-card-actions" onclick="event.stopPropagation()">
+                    <button class="action-btn edit" onclick="openMemoModal('${memo.id}')">編集</button>
+                    <button class="action-btn delete" onclick="deleteMemoConfirm('${memo.id}')">削除</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * メモモーダルを開く
+ */
+function openMemoModal(editId = null) {
+    const modal = document.getElementById('memoModal');
+    const form = document.getElementById('memoForm');
+    const title = document.getElementById('memoModalTitle');
+    
+    form.reset();
+    document.getElementById('memoId').value = '';
+    
+    if (editId) {
+        title.textContent = 'メモを編集';
+        const memos = getMemos();
+        const memo = memos.find(m => m.id === editId);
+        if (memo) {
+            document.getElementById('memoId').value = memo.id;
+            document.getElementById('memoTitle').value = memo.title;
+            document.getElementById('memoContent').value = memo.content || '';
+        }
+    } else {
+        title.textContent = '新規メモ';
+    }
+    
+    modal.classList.add('active');
+}
+
+/**
+ * メモモーダルを閉じる
+ */
+function closeMemoModal() {
+    document.getElementById('memoModal').classList.remove('active');
+}
+
+/**
+ * メモを保存
+ */
+function saveMemoForm(e) {
+    e.preventDefault();
+    
+    const id = document.getElementById('memoId').value;
+    const title = document.getElementById('memoTitle').value.trim();
+    const content = document.getElementById('memoContent').value;
+    
+    if (!title) return;
+    
+    const memos = getMemos();
+    const now = new Date().toISOString();
+    
+    if (id) {
+        const index = memos.findIndex(m => m.id === id);
+        if (index !== -1) {
+            memos[index] = { ...memos[index], title, content, updatedAt: now };
+        }
+    } else {
+        memos.push({
+            id: generateId(),
+            title,
+            content,
+            createdAt: now,
+            updatedAt: now
+        });
+    }
+    
+    saveMemos(memos);
+    closeMemoModal();
+    renderMemoList();
+}
+
+/**
+ * メモ削除確認
+ */
+function deleteMemoConfirm(id) {
+    deleteTarget = { type: 'memo', id };
+    document.getElementById('deleteModal').classList.add('active');
 }
 
 // ========================================
@@ -1006,6 +1138,10 @@ function confirmDelete() {
         saveRoutines(routines);
         renderRoutineList();
         updateDashboard();
+    } else if (deleteTarget.type === 'memo') {
+        const memos = getMemos().filter(m => m.id !== deleteTarget.id);
+        saveMemos(memos);
+        renderMemoList();
     }
     
     closeDeleteModal();
@@ -1036,7 +1172,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCalendar();
     renderRoutineList();
     renderTodoList();
-    initMemo();
+    renderMemoList();
     
     // サイドバートグル
     const menuBtn = document.getElementById('menuBtn');
@@ -1122,6 +1258,16 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('weekdayGroup').style.display = 
             e.target.value === 'weekly' ? 'block' : 'none';
     });
+    
+    // メモ追加ボタン
+    document.getElementById('addMemoBtn').addEventListener('click', () => {
+        openMemoModal();
+    });
+    
+    // メモモーダル
+    document.getElementById('closeMemoModal').addEventListener('click', closeMemoModal);
+    document.getElementById('cancelMemo').addEventListener('click', closeMemoModal);
+    document.getElementById('memoForm').addEventListener('submit', saveMemoForm);
     
     // 削除モーダル
     document.getElementById('cancelDelete').addEventListener('click', closeDeleteModal);

@@ -2,7 +2,7 @@
     "name": "締め切り管理",
     "short_name": "締め切り",
     "description": "大会・試験・課題などの締め切りを管理するアプリ",
-    "start_url": "/",
+    "start_url": "/reminder/",
     "display": "standalone",
     "background_color": "#0f0f0f",
     "theme_color": "#0f0f0f",

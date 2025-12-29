@@ -19,15 +19,10 @@
 // データ保存用キー
 const STORAGE_KEYS = {
     SCHEDULES: 'deadline_schedules',
-    ROUTINES: 'deadline_routines'
-};
-
-// 種別の日本語マッピング
-const TYPE_LABELS = {
-    assignment: '課題',
-    exam: '試験',
-    competition: '大会',
-    routine: 'ルーティーン'
+    ROUTINES: 'deadline_routines',
+    TODOS: 'deadline_todos',
+    MEMO: 'deadline_memo',
+    ROUTINE_CHECKS: 'deadline_routine_checks'
 };
 
 // 現在表示中のカレンダー月
@@ -102,6 +97,86 @@ function getRoutines() {
 function saveRoutines(routines) {
     saveToStorage(STORAGE_KEYS.ROUTINES, routines);
 }
+
+/**
+ * TODOデータを取得
+ * @returns {Array} TODO配列
+ */
+function getTodos() {
+    return loadFromStorage(STORAGE_KEYS.TODOS);
+}
+
+/**
+ * TODOデータを保存
+ * @param {Array} todos - TODO配列
+ */
+function saveTodos(todos) {
+    saveToStorage(STORAGE_KEYS.TODOS, todos);
+}
+
+/**
+ * メモデータを取得
+ * @returns {string} メモ文字列
+ */
+function getMemo() {
+    try {
+        return localStorage.getItem(STORAGE_KEYS.MEMO) || '';
+    } catch (e) {
+        return '';
+    }
+}
+
+/**
+ * メモデータを保存
+ * @param {string} memo - メモ文字列
+ */
+function saveMemo(memo) {
+    try {
+        localStorage.setItem(STORAGE_KEYS.MEMO, memo);
+    } catch (e) {
+        console.error('Memo save error:', e);
+    }
+}
+
+/**
+ * ルーティーン完了状態を取得（今日の日付キー）
+ * @returns {Array} 完了したルーティーンIDの配列
+ */
+function getRoutineChecks() {
+    const todayKey = getTodayString();
+    try {
+        const data = localStorage.getItem(STORAGE_KEYS.ROUTINE_CHECKS);
+        const checks = data ? JSON.parse(data) : {};
+        return checks[todayKey] || [];
+    } catch (e) {
+        return [];
+    }
+}
+
+/**
+ * ルーティーン完了状態を保存
+ * @param {Array} checkedIds - 完了したルーティーンIDの配列
+ */
+function saveRoutineChecks(checkedIds) {
+    const todayKey = getTodayString();
+    try {
+        const data = localStorage.getItem(STORAGE_KEYS.ROUTINE_CHECKS);
+        const checks = data ? JSON.parse(data) : {};
+        // 古いデータを削除（7日以上前）
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        Object.keys(checks).forEach(key => {
+            if (new Date(key) < weekAgo) {
+                delete checks[key];
+            }
+        });
+        checks[todayKey] = checkedIds;
+        localStorage.setItem(STORAGE_KEYS.ROUTINE_CHECKS, JSON.stringify(checks));
+    } catch (e) {
+        console.error('Routine checks save error:', e);
+    }
+}
+
 
 // ========================================
 // 3. UIユーティリティ
@@ -268,11 +343,13 @@ function renderScheduleList(items) {
             </div>
         `;
         
+        const routineBadge = item.isRoutine ? '<span class="schedule-badge routine">ルーティーン</span>' : '';
+        
         return `
-            <div class="${cardClass}" data-type="${item.type}">
+            <div class="${cardClass}">
                 <div class="schedule-header">
                     <span class="schedule-title">${escapeHtml(item.title)}</span>
-                    <span class="schedule-badge ${item.type}">${TYPE_LABELS[item.type]}</span>
+                    ${routineBadge}
                 </div>
                 <div class="schedule-info">
                     <span class="schedule-date">${formatDateForDisplay(item.date)}</span>
@@ -421,7 +498,7 @@ function updateSelectedDateInfo(dateStr) {
         schedulesEl.innerHTML = schedules.map(s => `
             <div class="date-schedule-item">
                 <span>${escapeHtml(s.title)}</span>
-                <span class="schedule-badge ${s.type}">${TYPE_LABELS[s.type]}</span>
+                <button class="action-btn delete small" onclick="deleteScheduleConfirm('${s.id}')">削除</button>
             </div>
         `).join('');
     }
@@ -455,9 +532,13 @@ function renderRoutineList() {
     const listEl = document.getElementById('routineList');
     const emptyEl = document.getElementById('routineEmptyState');
     
+    // 今日のルーティーンを描画
+    renderTodayRoutines();
+    
     if (routines.length === 0) {
         listEl.style.display = 'none';
         emptyEl.style.display = 'block';
+        document.getElementById('todayRoutines').style.display = 'none';
         return;
     }
     
@@ -466,7 +547,7 @@ function renderRoutineList() {
     
     const weekdayNames = ['日', '月', '火', '水', '木', '金', '土'];
     
-    listEl.innerHTML = routines.map(routine => {
+    listEl.innerHTML = '<h3 style="margin: 16px 0 12px; font-size: 1rem; color: var(--text-secondary);">登録済みルーティーン</h3>' + routines.map(routine => {
         let frequencyText = '';
         if (routine.frequency === 'daily') {
             frequencyText = '毎日';
@@ -494,6 +575,65 @@ function renderRoutineList() {
 }
 
 /**
+ * 今日のルーティーンを描画
+ */
+function renderTodayRoutines() {
+    const routines = getRoutines();
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const checks = getRoutineChecks();
+    
+    // 今日実行すべきルーティーンをフィルタ
+    const todayRoutines = routines
+        .filter(r => r.enabled)
+        .filter(r => {
+            if (r.frequency === 'daily') return true;
+            if (r.frequency === 'weekly' && r.weekdays.includes(dayOfWeek)) return true;
+            return false;
+        });
+    
+    const containerEl = document.getElementById('todayRoutines');
+    const listEl = document.getElementById('todayRoutineList');
+    
+    if (todayRoutines.length === 0) {
+        containerEl.style.display = 'none';
+        return;
+    }
+    
+    containerEl.style.display = 'block';
+    
+    listEl.innerHTML = todayRoutines.map(routine => {
+        const isChecked = checks.includes(routine.id);
+        return `
+            <div class="today-routine-item ${isChecked ? 'completed' : ''}">
+                <div class="routine-checkbox ${isChecked ? 'checked' : ''}" 
+                     onclick="toggleRoutineCheck('${routine.id}')"></div>
+                <span class="routine-check-title">${escapeHtml(routine.title)}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * ルーティーンの完了状態を切り替え
+ * @param {string} id - ルーティーンID
+ */
+function toggleRoutineCheck(id) {
+    const checks = getRoutineChecks();
+    const index = checks.indexOf(id);
+    
+    if (index === -1) {
+        checks.push(id);
+    } else {
+        checks.splice(index, 1);
+    }
+    
+    saveRoutineChecks(checks);
+    renderTodayRoutines();
+    updateDashboard();
+}
+
+/**
  * ルーティーンの有効/無効を切り替え
  * @param {string} id - ルーティーンID
  */
@@ -506,6 +646,118 @@ function toggleRoutine(id) {
         renderRoutineList();
         updateDashboard();
     }
+}
+
+// ========================================
+// 6.5 TODO機能
+// ========================================
+
+/**
+ * TODOリストを描画
+ */
+function renderTodoList() {
+    const todos = getTodos();
+    const listEl = document.getElementById('todoList');
+    const emptyEl = document.getElementById('todoEmptyState');
+    
+    if (todos.length === 0) {
+        listEl.style.display = 'none';
+        emptyEl.style.display = 'block';
+        return;
+    }
+    
+    listEl.style.display = 'flex';
+    emptyEl.style.display = 'none';
+    
+    // 未完了を先に、完了を後に
+    const sortedTodos = [...todos].sort((a, b) => {
+        if (a.completed === b.completed) return 0;
+        return a.completed ? 1 : -1;
+    });
+    
+    listEl.innerHTML = sortedTodos.map(todo => `
+        <div class="todo-item ${todo.completed ? 'completed' : ''}">
+            <div class="todo-checkbox ${todo.completed ? 'checked' : ''}" 
+                 onclick="toggleTodo('${todo.id}')"></div>
+            <span class="todo-text">${escapeHtml(todo.text)}</span>
+            <button class="todo-delete" onclick="deleteTodo('${todo.id}')">削除</button>
+        </div>
+    `).join('');
+}
+
+/**
+ * TODOを追加
+ */
+function addTodo() {
+    const input = document.getElementById('todoInput');
+    const text = input.value.trim();
+    
+    if (!text) return;
+    
+    const todos = getTodos();
+    todos.push({
+        id: generateId(),
+        text,
+        completed: false,
+        createdAt: new Date().toISOString()
+    });
+    
+    saveTodos(todos);
+    input.value = '';
+    renderTodoList();
+}
+
+/**
+ * TODOの完了状態を切り替え
+ * @param {string} id - TODO ID
+ */
+function toggleTodo(id) {
+    const todos = getTodos();
+    const index = todos.findIndex(t => t.id === id);
+    
+    if (index !== -1) {
+        todos[index].completed = !todos[index].completed;
+        saveTodos(todos);
+        renderTodoList();
+    }
+}
+
+/**
+ * TODOを削除
+ * @param {string} id - TODO ID
+ */
+function deleteTodo(id) {
+    const todos = getTodos().filter(t => t.id !== id);
+    saveTodos(todos);
+    renderTodoList();
+}
+
+// ========================================
+// 6.6 メモ機能
+// ========================================
+
+/**
+ * メモを初期化
+ */
+function initMemo() {
+    const textarea = document.getElementById('memoTextarea');
+    const statusEl = document.getElementById('memoStatus');
+    
+    // 保存されているメモを読み込み
+    textarea.value = getMemo();
+    
+    let saveTimeout;
+    
+    // 入力時に自動保存
+    textarea.addEventListener('input', () => {
+        statusEl.textContent = '保存中...';
+        
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+            saveMemo(textarea.value);
+            statusEl.textContent = '保存済み';
+        }, 500);
+    });
 }
 
 // ========================================
@@ -531,7 +783,6 @@ function openScheduleModal(editId = null) {
         if (schedule) {
             document.getElementById('scheduleId').value = schedule.id;
             document.getElementById('scheduleTitle').value = schedule.title;
-            document.getElementById('scheduleType').value = schedule.type;
             document.getElementById('scheduleDate').value = schedule.date;
             document.getElementById('scheduleMemo').value = schedule.memo || '';
         }
@@ -565,11 +816,10 @@ function saveSchedule(e) {
     
     const id = document.getElementById('scheduleId').value;
     const title = document.getElementById('scheduleTitle').value.trim();
-    const type = document.getElementById('scheduleType').value;
     const date = document.getElementById('scheduleDate').value;
     const memo = document.getElementById('scheduleMemo').value.trim();
     
-    if (!title || !type || !date) return;
+    if (!title || !date) return;
     
     const schedules = getSchedules();
     
@@ -577,14 +827,13 @@ function saveSchedule(e) {
         // 更新
         const index = schedules.findIndex(s => s.id === id);
         if (index !== -1) {
-            schedules[index] = { ...schedules[index], title, type, date, memo };
+            schedules[index] = { ...schedules[index], title, date, memo };
         }
     } else {
         // 新規追加
         schedules.push({
             id: generateId(),
             title,
-            type,
             date,
             memo
         });
@@ -786,6 +1035,8 @@ document.addEventListener('DOMContentLoaded', () => {
     updateDashboard();
     renderCalendar();
     renderRoutineList();
+    renderTodoList();
+    initMemo();
     
     // サイドバートグル
     const menuBtn = document.getElementById('menuBtn');
@@ -824,7 +1075,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const titles = {
                 dashboard: 'ダッシュボード',
                 calendar: 'カレンダー',
-                routine: 'ルーティーン管理'
+                todo: 'TODOリスト',
+                routine: 'ルーティーン管理',
+                memo: 'メモ帳'
             };
             document.getElementById('headerTitle').textContent = titles[view];
             
@@ -839,6 +1092,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // 予定追加ボタン
     document.getElementById('addScheduleBtn').addEventListener('click', () => {
         openScheduleModal();
+    });
+    
+    // TODO追加
+    document.getElementById('addTodoBtn').addEventListener('click', addTodo);
+    document.getElementById('todoInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            addTodo();
+        }
     });
     
     // 予定モーダル

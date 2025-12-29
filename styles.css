@@ -412,6 +412,12 @@ body {
     color: var(--color-overdue);
 }
 
+.action-btn.delete.small {
+    flex: none;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+}
+
 /* 空状態 */
 .empty-state {
     text-align: center;
@@ -889,4 +895,222 @@ body {
         margin-left: auto;
         margin-right: auto;
     }
+}
+
+/* ========================================
+   TODOリスト
+======================================== */
+.todo-header {
+    margin-bottom: 16px;
+}
+
+.todo-header h2 {
+    font-size: 1.1rem;
+}
+
+.todo-input-area {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.todo-input-area input {
+    flex: 1;
+    padding: 14px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.todo-input-area input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.add-todo-btn {
+    padding: 14px 20px;
+    background-color: var(--accent-primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.todo-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.todo-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    background-color: var(--bg-secondary);
+    border-radius: var(--radius);
+    transition: all 0.2s ease;
+}
+
+.todo-item.completed {
+    opacity: 0.6;
+}
+
+.todo-item.completed .todo-text {
+    text-decoration: line-through;
+    color: var(--text-muted);
+}
+
+.todo-checkbox {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    border: 2px solid var(--border-color);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.todo-checkbox.checked {
+    background-color: var(--color-today);
+    border-color: var(--color-today);
+}
+
+.todo-checkbox.checked::after {
+    content: '✓';
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.todo-text {
+    flex: 1;
+    font-size: 1rem;
+}
+
+.todo-delete {
+    padding: 8px 12px;
+    background-color: rgba(255, 71, 87, 0.2);
+    color: var(--color-overdue);
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+/* ========================================
+   メモ帳
+======================================== */
+.memo-header {
+    margin-bottom: 16px;
+}
+
+.memo-header h2 {
+    font-size: 1.1rem;
+}
+
+#memoTextarea {
+    width: 100%;
+    min-height: calc(100vh - 200px);
+    padding: 16px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-family: inherit;
+    line-height: 1.8;
+    resize: none;
+}
+
+#memoTextarea:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.memo-status {
+    margin-top: 8px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-align: right;
+}
+
+/* ========================================
+   今日のルーティーン（チェック機能付き）
+======================================== */
+.today-routines {
+    margin-bottom: 24px;
+    padding: 16px;
+    background-color: var(--bg-secondary);
+    border-radius: var(--radius);
+}
+
+.today-routines h3 {
+    font-size: 1rem;
+    margin-bottom: 12px;
+    color: var(--accent-primary);
+}
+
+.today-routine-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.today-routine-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--color-routine);
+}
+
+.today-routine-item.completed {
+    opacity: 0.6;
+    border-left-color: var(--color-today);
+}
+
+.today-routine-item.completed .routine-check-title {
+    text-decoration: line-through;
+    color: var(--text-muted);
+}
+
+.routine-checkbox {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    border: 2px solid var(--color-routine);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.routine-checkbox.checked {
+    background-color: var(--color-today);
+    border-color: var(--color-today);
+}
+
+.routine-checkbox.checked::after {
+    content: '✓';
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.routine-check-title {
+    flex: 1;
+    font-size: 1rem;
 }

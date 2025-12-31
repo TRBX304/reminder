@@ -539,12 +539,24 @@ function updateSelectedDateInfo(dateStr) {
     if (schedules.length === 0) {
         schedulesEl.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 16px;">予定なし</p>';
     } else {
-        schedulesEl.innerHTML = schedules.map(s => `
-            <div class="date-schedule-item">
-                <span>${escapeHtml(s.title)}</span>
-                <button class="action-btn delete small" onclick="deleteScheduleConfirm('${s.id}')">削除</button>
-            </div>
-        `).join('');
+        schedulesEl.innerHTML = schedules.map(s => {
+            const memoHtml = s.memo 
+                ? `<div class="date-schedule-memo">${escapeHtml(s.memo)}</div>` 
+                : '';
+            
+            return `
+                <div class="date-schedule-item">
+                    <div class="date-schedule-content">
+                        <span class="date-schedule-title">${escapeHtml(s.title)}</span>
+                        ${memoHtml}
+                    </div>
+                    <div class="date-schedule-actions">
+                        <button class="action-btn edit small" onclick="editSchedule('${s.id}')">編集</button>
+                        <button class="action-btn delete small" onclick="deleteScheduleConfirm('${s.id}')">削除</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 }
 

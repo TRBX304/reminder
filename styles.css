@@ -1223,3 +1223,108 @@ body {
     flex: 1;
     font-size: 1rem;
 }
+
+/* ========================================
+   設定画面
+======================================== */
+.settings-section {
+    background-color: var(--bg-secondary);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+}
+
+.settings-section h2 {
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.setting-item {
+    margin-bottom: 16px;
+}
+
+.setting-item label {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.setting-item select {
+    width: 100%;
+    padding: 12px;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.setting-desc {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+.backup-group {
+    margin-bottom: 24px;
+}
+
+.backup-group:last-child {
+    margin-bottom: 0;
+}
+
+.backup-group h3 {
+    font-size: 1rem;
+    margin-bottom: 8px;
+}
+
+.backup-textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 12px;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-family: monospace;
+    resize: vertical;
+    margin-bottom: 8px;
+}
+
+.backup-textarea:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+
+.btn-backup {
+    width: 100%;
+    padding: 12px;
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    cursor: pointer;
+    margin-bottom: 8px;
+}
+
+.btn-copy {
+    width: 100%;
+    padding: 12px;
+    background-color: var(--color-today);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+#saveSettings {
+    width: 100%;
+    margin-top: 8px;
+}

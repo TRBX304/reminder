@@ -616,11 +616,41 @@ body {
     margin-bottom: 8px;
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
+    gap: 12px;
 }
 
 .date-schedule-item:last-child {
     margin-bottom: 0;
+}
+
+.date-schedule-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.date-schedule-title {
+    font-weight: 600;
+    word-break: break-word;
+}
+
+.date-schedule-memo {
+    margin-top: 8px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.date-schedule-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.action-btn.edit.small {
+    padding: 6px 12px;
+    font-size: 0.75rem;
 }
 
 .add-schedule-btn {

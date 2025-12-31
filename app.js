@@ -22,7 +22,8 @@ const STORAGE_KEYS = {
     ROUTINES: 'deadline_routines',
     TODOS: 'deadline_todos',
     MEMOS: 'deadline_memos',
-    ROUTINE_CHECKS: 'deadline_routine_checks'
+    ROUTINE_CHECKS: 'deadline_routine_checks',
+    SETTINGS: 'deadline_settings'
 };
 
 // 現在表示中のカレンダー月
@@ -169,6 +170,31 @@ function saveRoutineChecks(checkedIds) {
     }
 }
 
+/**
+ * 設定を取得
+ * @returns {object} 設定オブジェクト
+ */
+function getSettings() {
+    try {
+        const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+        return data ? JSON.parse(data) : { overdueWeeks: 2, maxSchedules: 0 };
+    } catch (e) {
+        return { overdueWeeks: 2, maxSchedules: 0 };
+    }
+}
+
+/**
+ * 設定を保存
+ * @param {object} settings - 設定オブジェクト
+ */
+function saveSettings(settings) {
+    try {
+        localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    } catch (e) {
+        console.error('Settings save error:', e);
+    }
+}
+
 
 // ========================================
 // 3. UIユーティリティ
@@ -244,9 +270,14 @@ function getTodayString() {
 function updateDashboard() {
     const schedules = getSchedules();
     const routines = getRoutines();
+    const settings = getSettings();
     const todayStr = getTodayString();
     const today = new Date();
     const dayOfWeek = today.getDay();
+    
+    // 設定から期限切れ表示期間を取得（週→日に変換）
+    const overdueDays = settings.overdueWeeks * 7;
+    const maxSchedules = settings.maxSchedules;
     
     // 今日のルーティーンを予定として追加
     const todayRoutines = routines
@@ -264,41 +295,47 @@ function updateDashboard() {
             isRoutine: true
         }));
     
-    // 統計用：2週間以内の期限切れのみカウント
-    const recentSchedules = schedules.filter(s => getDaysRemaining(s.date) >= -14);
-    updateStats(recentSchedules);
+    // 統計用：設定期間内の期限切れのみカウント
+    const recentSchedules = schedules.filter(s => getDaysRemaining(s.date) >= -overdueDays);
+    updateStats(recentSchedules, overdueDays);
     
-    // リスト表示：期限切れ2週間以内は表示、2週間超過は非表示
-    const validSchedules = schedules.filter(s => getDaysRemaining(s.date) >= -14);
+    // リスト表示：期限切れは設定期間内のみ表示
+    const validSchedules = schedules.filter(s => getDaysRemaining(s.date) >= -overdueDays);
     
     // 全予定を結合（ルーティーンは今日のみ表示）
-    const allItems = [...validSchedules, ...todayRoutines];
+    let allItems = [...validSchedules, ...todayRoutines];
     
     // 締め切り順にソート
-    const sortedItems = allItems.sort((a, b) => {
+    allItems.sort((a, b) => {
         const daysA = getDaysRemaining(a.date);
         const daysB = getDaysRemaining(b.date);
         return daysA - daysB;
     });
     
+    // 表示件数制限（0の場合は全件表示）
+    if (maxSchedules > 0) {
+        allItems = allItems.slice(0, maxSchedules);
+    }
+    
     // リストを更新
-    renderScheduleList(sortedItems);
+    renderScheduleList(allItems);
 }
 
 /**
  * 統計バーを更新
- * @param {Array} schedules - 予定配列（2週間超過除外済み）
+ * @param {Array} schedules - 予定配列
+ * @param {number} overdueDays - 期限切れ表示日数
  */
-function updateStats(schedules) {
+function updateStats(schedules, overdueDays) {
     const totalCount = schedules.length;
     const urgentCount = schedules.filter(item => {
         const days = getDaysRemaining(item.date);
         return days >= 0 && days <= 3;
     }).length;
-    // 2週間以内の期限切れのみカウント（-14〜-1日）
+    // 設定期間内の期限切れのみカウント
     const overdueCount = schedules.filter(item => {
         const days = getDaysRemaining(item.date);
-        return days < 0 && days >= -14;
+        return days < 0 && days >= -overdueDays;
     }).length;
     
     document.getElementById('totalCount').textContent = totalCount;
@@ -1233,9 +1270,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 calendar: 'カレンダー',
                 todo: 'TODOリスト',
                 routine: 'ルーティーン管理',
-                memo: 'メモ帳'
+                memo: 'メモ帳',
+                settings: '設定'
             };
             document.getElementById('headerTitle').textContent = titles[view];
+            
+            // 設定画面を開いたら現在の設定を読み込み
+            if (view === 'settings') {
+                loadSettingsUI();
+            }
             
             closeSidebarFn();
         });
@@ -1292,4 +1335,120 @@ document.addEventListener('DOMContentLoaded', () => {
     // 削除モーダル
     document.getElementById('cancelDelete').addEventListener('click', closeDeleteModal);
     document.getElementById('confirmDelete').addEventListener('click', confirmDelete);
+    
+    // 設定保存
+    document.getElementById('saveSettings').addEventListener('click', saveSettingsFromUI);
+    
+    // バックアップ
+    document.getElementById('exportBtn').addEventListener('click', exportData);
+    document.getElementById('copyExportBtn').addEventListener('click', copyExportData);
+    document.getElementById('importBtn').addEventListener('click', importData);
 });
+
+// ========================================
+// 9. 設定・バックアップ機能
+// ========================================
+
+/**
+ * 設定画面にUIを読み込み
+ */
+function loadSettingsUI() {
+    const settings = getSettings();
+    document.getElementById('overdueWeeks').value = settings.overdueWeeks;
+    document.getElementById('maxSchedules').value = settings.maxSchedules;
+}
+
+/**
+ * UIから設定を保存
+ */
+function saveSettingsFromUI() {
+    const settings = {
+        overdueWeeks: parseInt(document.getElementById('overdueWeeks').value),
+        maxSchedules: parseInt(document.getElementById('maxSchedules').value)
+    };
+    saveSettings(settings);
+    updateDashboard();
+    alert('設定を保存しました');
+}
+
+/**
+ * データをエクスポート
+ */
+function exportData() {
+    const data = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        schedules: getSchedules(),
+        routines: getRoutines(),
+        todos: getTodos(),
+        memos: getMemos(),
+        settings: getSettings()
+    };
+    
+    const jsonStr = JSON.stringify(data, null, 2);
+    const textarea = document.getElementById('exportData');
+    textarea.value = jsonStr;
+    document.getElementById('copyExportBtn').style.display = 'block';
+}
+
+/**
+ * エクスポートデータをコピー
+ */
+function copyExportData() {
+    const textarea = document.getElementById('exportData');
+    textarea.select();
+    navigator.clipboard.writeText(textarea.value).then(() => {
+        alert('コピーしました');
+    }).catch(() => {
+        // フォールバック
+        document.execCommand('copy');
+        alert('コピーしました');
+    });
+}
+
+/**
+ * データをインポート
+ */
+function importData() {
+    const textarea = document.getElementById('importData');
+    const jsonStr = textarea.value.trim();
+    
+    if (!jsonStr) {
+        alert('データを貼り付けてください');
+        return;
+    }
+    
+    try {
+        const data = JSON.parse(jsonStr);
+        
+        if (!data.version) {
+            alert('無効なバックアップデータです');
+            return;
+        }
+        
+        if (!confirm('現在のデータを上書きしますか？')) {
+            return;
+        }
+        
+        // データを復元
+        if (data.schedules) saveSchedules(data.schedules);
+        if (data.routines) saveRoutines(data.routines);
+        if (data.todos) saveTodos(data.todos);
+        if (data.memos) saveMemos(data.memos);
+        if (data.settings) saveSettings(data.settings);
+        
+        // 画面を更新
+        updateDashboard();
+        renderCalendar();
+        renderRoutineList();
+        renderTodoList();
+        renderMemoList();
+        loadSettingsUI();
+        
+        textarea.value = '';
+        alert('データを復元しました');
+        
+    } catch (e) {
+        alert('データの形式が正しくありません');
+    }
+}

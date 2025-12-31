@@ -264,11 +264,12 @@ function updateDashboard() {
             isRoutine: true
         }));
     
-    // 統計は全予定で計算（期限切れも含む）
-    updateStats(schedules);
+    // 統計用：2週間以内の期限切れのみカウント
+    const recentSchedules = schedules.filter(s => getDaysRemaining(s.date) >= -14);
+    updateStats(recentSchedules);
     
-    // リスト表示は期限切れを除外
-    const validSchedules = schedules.filter(s => getDaysRemaining(s.date) >= 0);
+    // リスト表示：期限切れ2週間以内は表示、2週間超過は非表示
+    const validSchedules = schedules.filter(s => getDaysRemaining(s.date) >= -14);
     
     // 全予定を結合（ルーティーンは今日のみ表示）
     const allItems = [...validSchedules, ...todayRoutines];
@@ -286,7 +287,7 @@ function updateDashboard() {
 
 /**
  * 統計バーを更新
- * @param {Array} schedules - 全予定配列
+ * @param {Array} schedules - 予定配列（2週間超過除外済み）
  */
 function updateStats(schedules) {
     const totalCount = schedules.length;
@@ -294,7 +295,11 @@ function updateStats(schedules) {
         const days = getDaysRemaining(item.date);
         return days >= 0 && days <= 3;
     }).length;
-    const overdueCount = schedules.filter(item => getDaysRemaining(item.date) < 0).length;
+    // 2週間以内の期限切れのみカウント（-14〜-1日）
+    const overdueCount = schedules.filter(item => {
+        const days = getDaysRemaining(item.date);
+        return days < 0 && days >= -14;
+    }).length;
     
     document.getElementById('totalCount').textContent = totalCount;
     document.getElementById('urgentCount').textContent = urgentCount;

@@ -36,6 +36,9 @@
             <li><a href="#" class="nav-item" data-view="memo">
                 <span class="nav-icon">📝</span>メモ帳
             </a></li>
+            <li><a href="#" class="nav-item" data-view="settings">
+                <span class="nav-icon">⚙️</span>設定
+            </a></li>
         </ul>
     </nav>
     <div class="overlay" id="overlay"></div>
@@ -166,6 +169,56 @@
             </div>
             <div class="empty-state" id="memoEmptyState">
                 <p>メモがありません</p>
+            </div>
+        </section>
+
+        <!-- 設定画面 -->
+        <section class="view" id="settingsView">
+            <div class="settings-section">
+                <h2>表示設定</h2>
+                
+                <div class="setting-item">
+                    <label for="overdueWeeks">期限切れを表示する期間</label>
+                    <select id="overdueWeeks">
+                        <option value="1">1週間</option>
+                        <option value="2" selected>2週間</option>
+                        <option value="3">3週間</option>
+                        <option value="4">4週間</option>
+                        <option value="0">表示しない</option>
+                    </select>
+                </div>
+                
+                <div class="setting-item">
+                    <label for="maxSchedules">ダッシュボードの予定表示数</label>
+                    <select id="maxSchedules">
+                        <option value="0" selected>すべて表示</option>
+                        <option value="5">5件</option>
+                        <option value="10">10件</option>
+                        <option value="20">20件</option>
+                        <option value="30">30件</option>
+                    </select>
+                </div>
+                
+                <button class="btn-save" id="saveSettings">設定を保存</button>
+            </div>
+            
+            <div class="settings-section">
+                <h2>バックアップ</h2>
+                
+                <div class="backup-group">
+                    <h3>エクスポート（書き出し）</h3>
+                    <p class="setting-desc">下のボタンを押すとデータがテキストで表示されます。コピーして保存してください。</p>
+                    <button class="btn-backup" id="exportBtn">データを書き出す</button>
+                    <textarea id="exportData" class="backup-textarea" readonly placeholder="ここにデータが表示されます"></textarea>
+                    <button class="btn-copy" id="copyExportBtn" style="display: none;">コピーする</button>
+                </div>
+                
+                <div class="backup-group">
+                    <h3>インポート（読み込み）</h3>
+                    <p class="setting-desc">バックアップしたテキストを貼り付けて、読み込みボタンを押してください。</p>
+                    <textarea id="importData" class="backup-textarea" placeholder="ここにバックアップデータを貼り付け"></textarea>
+                    <button class="btn-backup" id="importBtn">データを読み込む</button>
+                </div>
             </div>
         </section>
     </main>

@@ -1271,7 +1271,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 todo: 'TODOリスト',
                 routine: 'ルーティーン管理',
                 memo: 'メモ帳',
-                settings: '設定'
+                settings: '設定',
+                about: '説明'
             };
             document.getElementById('headerTitle').textContent = titles[view];
             

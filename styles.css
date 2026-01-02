@@ -196,6 +196,137 @@ body {
     font-size: 1.2rem;
 }
 
+/* ========================================
+   説明画面（About）
+======================================== */
+.about-section {
+    background-color: var(--bg-secondary);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 16px;
+}
+
+.about-icon {
+    font-size: 2rem;
+    margin-bottom: 12px;
+}
+
+.about-section h2 {
+    font-size: 1.1rem;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.about-section p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    line-height: 1.6;
+}
+
+.about-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 12px;
+    background-color: rgba(74, 158, 255, 0.1);
+    border-radius: var(--radius-sm);
+    color: var(--accent-primary);
+    font-size: 0.85rem;
+}
+
+.about-note {
+    margin-top: 12px;
+    padding: 12px;
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    color: var(--accent-primary);
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+/* 使い方ステップ */
+.usage-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 16px 0;
+}
+
+.usage-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+}
+
+.step-number {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--accent-primary);
+    color: white;
+    border-radius: 50%;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.step-text {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+/* インストールカード */
+.install-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.install-card {
+    padding: 16px;
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--accent-primary);
+}
+
+.install-platform {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.install-steps {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* お問い合わせボタン */
+.contact-button {
+    display: block;
+    margin-top: 16px;
+    padding: 14px 20px;
+    background-color: var(--accent-primary);
+    color: white;
+    text-decoration: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.contact-button:hover {
+    background-color: var(--accent-secondary);
+}
+
 .overlay {
     position: fixed;
     top: 0;

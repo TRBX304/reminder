@@ -1266,7 +1266,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // ヘッダータイトルを更新
             const titles = {
-                dashboard: 'ダッシュボード',
+                dashboard: '締め切り管理',
                 calendar: 'カレンダー',
                 todo: 'TODOリスト',
                 routine: 'ルーティーン管理',

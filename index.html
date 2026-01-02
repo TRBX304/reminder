@@ -45,6 +45,9 @@
             <li><a href="#" class="nav-item" data-view="settings">
                 <span class="nav-icon">⚙️</span>設定
             </a></li>
+            <li><a href="#" class="nav-item" data-view="about">
+                <span class="nav-icon">❓</span>説明
+            </a></li>
         </ul>
     </nav>
     <div class="overlay" id="overlay"></div>
@@ -225,6 +228,65 @@
                     <textarea id="importData" class="backup-textarea" placeholder="ここにバックアップデータを貼り付け"></textarea>
                     <button class="btn-backup" id="importBtn">データを読み込む</button>
                 </div>
+            </div>
+        </section>
+
+        <!-- 説明画面 -->
+        <section class="view" id="aboutView">
+            <div class="about-section">
+                <div class="about-icon">📱</div>
+                <h2>このアプリについて</h2>
+                <p>ログイン不要・完全無料の軽量リマインダーです。</p>
+                <p>大会・試験・課題などの締め切りを、大きく見やすく表示することに特化しています。</p>
+                <div class="about-badge">
+                    <span>🔒</span>
+                    <span>データは端末内に保存され、サーバーへ送信されません</span>
+                </div>
+            </div>
+
+            <div class="about-section">
+                <div class="about-icon">📖</div>
+                <h2>使い方</h2>
+                <div class="usage-steps">
+                    <div class="usage-step">
+                        <div class="step-number">1</div>
+                        <div class="step-text">「カレンダー」から締め切りを登録</div>
+                    </div>
+                    <div class="usage-step">
+                        <div class="step-number">2</div>
+                        <div class="step-text">残り日数が自動で表示されます</div>
+                    </div>
+                    <div class="usage-step">
+                        <div class="step-number">3</div>
+                        <div class="step-text">期限が近い順に自動で並び替え</div>
+                    </div>
+                </div>
+                <p class="about-note">面倒な設定やアカウント登録は不要です！</p>
+            </div>
+
+            <div class="about-section">
+                <div class="about-icon">📲</div>
+                <h2>ホーム画面に追加</h2>
+                <p>このアプリはスマホにインストールできます。</p>
+                <div class="install-cards">
+                    <div class="install-card">
+                        <div class="install-platform">Android</div>
+                        <div class="install-steps">Chrome メニュー → 「ホーム画面に追加」</div>
+                    </div>
+                    <div class="install-card">
+                        <div class="install-platform">iPhone</div>
+                        <div class="install-steps">Safari 共有ボタン → 「ホーム画面に追加」</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="about-section">
+                <div class="about-icon">💬</div>
+                <h2>お問い合わせ</h2>
+                <p>ご意見・ご要望・バグ報告などお気軽にどうぞ！</p>
+                <a href="https://x.com/NaK0528" target="_blank" rel="noopener noreferrer" class="contact-button">
+                    @NaK0528 にメッセージを送る
+                </a>
             </div>
         </section>
     </main>

@@ -1,7 +1,7 @@
 {
-    "name": "締め切り管理",
-    "short_name": "締め切り",
-    "description": "大会・試験・課題などの締め切りを管理するアプリ",
+    "name": "締め切り管理リマインダー",
+    "short_name": "リマインダー",
+    "description": "ログイン不要で使える軽量リマインダー。大会・試験・課題などの締め切りを見やすく管理できます。",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#0f0f0f",

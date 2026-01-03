@@ -1364,7 +1364,7 @@ function loadSettingsUI() {
  */
 function saveSettingsFromUI() {
     const settings = {
-        overdueWeeks: parseInt(document.getElementById('overdueWeeks').value),
+        overdueWeeks: parseFloat(document.getElementById('overdueWeeks').value),
         maxSchedules: parseInt(document.getElementById('maxSchedules').value)
     };
     saveSettings(settings);

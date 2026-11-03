@@ -2,7 +2,7 @@
  * Service Worker - オフライン対応
  */
 
-const CACHE_NAME = 'deadline-app-v1';
+const CACHE_NAME = 'deadline-app-v2';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',

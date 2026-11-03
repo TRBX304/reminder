@@ -5,13 +5,14 @@
  * firebaseConfig の中身を、下の YOUR_... の部分に貼り付けてください。
  * （この値はブラウザから見えても問題ない値です。守りはセキュリティルールで行います）
  */
+
 export const firebaseConfig = {
-    apiKey: 'YOUR_API_KEY',
-    authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_PROJECT_ID.firebasestorage.app',
-    messagingSenderId: 'YOUR_SENDER_ID',
-    appId: 'YOUR_APP_ID'
+    apiKey: 'AIzaSyBPG651Im_c71hfd0y246eWF8QsbBdyzkQ',
+    authDomain: 'reminder-8b5.firebaseapp.com',
+    projectId: 'reminder-8b5',
+    storageBucket: 'reminder-8b5.firebasestorage.app',
+    messagingSenderId: '1521587119',
+    appId: '1:1521587119:web:1a0ddddded30626519155a'
 };
 
 /**

@@ -8,7 +8,7 @@
  */
 
 // ↓ 自分のFirebaseプロジェクトIDに書き換える
-const FIREBASE_AUTH_ORIGIN = 'https://YOUR_PROJECT_ID.firebaseapp.com';
+const FIREBASE_AUTH_ORIGIN = 'https://reminder-8b5.firebaseapp.com';
 
 export async function onRequest({ request }) {
     const url = new URL(request.url);

@@ -43,6 +43,16 @@ let state = null;           // 端末に保存する同期状態
 let unsubscribers = [];
 let pendingWrites = 0;
 let startingFor = null;     // 二重起動防止
+let lastError = null;       // 直近の同期エラー（成功したら消す）
+let lastSyncedAt = null;    // 最後に同期できた時刻
+let needsRetry = false;     // 送れなかった書き込みが残っているか
+
+// 自動再送（失敗したら少し待って最大3回まで送り直す）
+const MAX_RETRIES = 3;
+const RETRY_DELAYS = [3000, 6000, 12000]; // 1回目・2回目・3回目の再送までの待ち時間(ms)
+let retryAttempt = 0;       // 今の再送が何回目か（0 = 再送していない）
+let retryTimer = null;      // 次の再送の予約
+let gaveUp = false;         // 3回再送してもだめだった
 
 // ========================================
 // 小さな道具
@@ -136,9 +146,12 @@ const ui = {
     section: () => document.getElementById('syncSection'),
     status: () => document.getElementById('syncStatus'),
     loginBtn: () => document.getElementById('syncLoginBtn'),
-    logoutBtn: () => document.getElementById('syncLogoutBtn')
+    logoutBtn: () => document.getElementById('syncLogoutBtn'),
+    indicator: () => document.getElementById('syncIndicator'),
+    indicatorLabel: () => document.getElementById('syncIndicatorLabel')
 };
 
+/** 設定画面の状態欄に文字を出す（ログイン前の読み込み中・エラー表示にも使う） */
 function setStatus(text, kind = '') {
     const el = ui.status();
     if (!el) return;
@@ -146,33 +159,71 @@ function setStatus(text, kind = '') {
     el.className = 'sync-status' + (kind ? ` ${kind}` : '');
 }
 
-function renderAccountUI() {
-    const loginBtn = ui.loginBtn();
-    const logoutBtn = ui.logoutBtn();
-    if (!loginBtn || !logoutBtn) return;
+function formatTime(t) {
+    return `${t.getHours()}:${String(t.getMinutes()).padStart(2, '0')}`;
+}
 
-    if (currentUser) {
-        loginBtn.style.display = 'none';
-        logoutBtn.style.display = 'block';
-    } else {
-        loginBtn.style.display = 'block';
-        logoutBtn.style.display = 'none';
+/**
+ * 今の同期状態を、設定画面の状態欄とヘッダーのランプの両方に反映する
+ * ランプはログイン中だけ表示する
+ */
+function renderStatus() {
+    let lamp = null;      // 'synced' | 'syncing' | 'offline' | 'error' | null(非表示)
+    let lampText = '';
+
+    if (!currentUser) {
         setStatus('ログインしていません（データはこの端末だけに保存されています）');
+    } else {
+        const who = `${currentUser.email || 'Googleアカウント'} でログイン中`;
+        if (retryAttempt > 0 && !gaveUp) {
+            lamp = 'syncing';
+            lampText = `再送 ${retryAttempt}/${MAX_RETRIES}`;
+            setStatus(`${who}\n送信に失敗したため再送しています（${retryAttempt}/${MAX_RETRIES}回目）\n理由：${lastError}`, 'warn');
+        } else if (lastError) {
+            lamp = 'error';
+            lampText = '同期エラー';
+            setStatus(`${who}\n同期に失敗しました：${lastError}\n${gaveUp ? `${MAX_RETRIES}回再送しましたが届きませんでした。` : ''}次に変更したとき、またはアプリを開き直したときに再送します`, 'error');
+        } else if (!navigator.onLine) {
+            lamp = 'offline';
+            lampText = 'オフライン';
+            setStatus(ready
+                ? `${who}\nオフライン：つながったら自動で同期します`
+                : `${who}\n初回の同期にはインターネット接続が必要です。つながったら自動で再開します`, 'warn');
+        } else if (!ready || pendingWrites > 0) {
+            lamp = 'syncing';
+            lampText = '同期中';
+            setStatus(`${who}\n同期中…`);
+        } else {
+            lamp = 'synced';
+            lampText = '同期済み';
+            const at = lastSyncedAt ? `（${formatTime(lastSyncedAt)}）` : '';
+            setStatus(`${who}\n同期済み${at}`, 'ok');
+        }
+    }
+
+    const ind = ui.indicator();
+    if (ind) {
+        ind.hidden = !lamp;
+        ind.className = 'sync-indicator' + (lamp ? ` ${lamp}` : '');
+        ui.indicatorLabel().textContent = lampText;
     }
 }
 
-function updateSyncedStatus() {
-    if (!currentUser) return;
-    const who = currentUser.email || 'Googleアカウント';
-    if (!navigator.onLine) {
-        setStatus(`${who} でログイン中\nオフライン：つながったら自動で同期します`, 'warn');
-    } else if (pendingWrites > 0) {
-        setStatus(`${who} でログイン中\n同期中…`);
-    } else if (ready) {
-        const t = new Date();
-        const hm = `${t.getHours()}:${String(t.getMinutes()).padStart(2, '0')}`;
-        setStatus(`${who} でログイン中\n同期済み（${hm}）`, 'ok');
+function renderAccountUI() {
+    const loginBtn = ui.loginBtn();
+    const logoutBtn = ui.logoutBtn();
+    if (loginBtn && logoutBtn) {
+        loginBtn.style.display = currentUser ? 'none' : 'block';
+        logoutBtn.style.display = currentUser ? 'block' : 'none';
     }
+    renderStatus();
+}
+
+/** エラーを記録して表示する */
+function reportError(e) {
+    console.error('Sync error:', e);
+    lastError = e.code || e.message || String(e);
+    renderStatus();
 }
 
 // ========================================
@@ -188,43 +239,83 @@ function settingsRef() {
 }
 
 /**
+ * 送れなかった書き込みを「未同期」に戻す
+ * → 次に pushLocalDiff / pushSettingsDiff が走ったとき、ハッシュが合わないので送り直される
+ */
+function markUnsynced(ops) {
+    needsRetry = true;
+    for (const op of ops) {
+        if (op.settings) {
+            state.settingsHash = null;
+        } else {
+            state.synced[op.key] = state.synced[op.key] || {};
+            state.synced[op.key][op.id] = 'unsynced';
+        }
+    }
+    saveState();
+}
+
+/**
  * 書き込みをまとめて送る
- * @param {Array<{ref, data}>} ops
+ * @param {Array<{ref, data, key?, id?, settings?}>} ops
  */
 function commitOps(ops) {
     if (ops.length === 0) return;
 
     for (let i = 0; i < ops.length; i += BATCH_LIMIT) {
+        const chunk = ops.slice(i, i + BATCH_LIMIT);
         const batch = fb.writeBatch(db);
-        for (const op of ops.slice(i, i + BATCH_LIMIT)) {
+        for (const op of chunk) {
             batch.set(op.ref, op.data);
         }
         pendingWrites++;
-        updateSyncedStatus();
+        renderStatus();
         // オフラインでもFirestoreが端末内に覚えておき、つながったときに送ってくれる
         batch.commit()
+            .then(() => {
+                lastSyncedAt = new Date();
+                // 未送信が残っていなければ、エラーと再送の状態をリセット
+                if (!needsRetry && !retryTimer) {
+                    lastError = null;
+                    retryAttempt = 0;
+                    gaveUp = false;
+                }
+            })
             .catch((e) => {
-                console.error('Sync write error:', e);
-                setStatus('同期に失敗しました：' + (e.code || e.message), 'error');
+                markUnsynced(chunk);
+                scheduleRetry();
+                reportError(e);
             })
             .finally(() => {
                 pendingWrites--;
-                updateSyncedStatus();
+                renderStatus();
             });
     }
 }
 
-function upsertOp(name, item) {
+function upsertOp(key, item) {
     return {
-        ref: itemRef(name, item.id),
+        key,
+        id: item.id,
+        ref: itemRef(COLLECTIONS[key], item.id),
         data: { data: item, deleted: false, updatedAt: fb.serverTimestamp() }
     };
 }
 
-function deleteOp(name, id) {
+function deleteOp(key, id) {
     return {
-        ref: itemRef(name, id),
+        key,
+        id,
+        ref: itemRef(COLLECTIONS[key], id),
         data: { data: null, deleted: true, updatedAt: fb.serverTimestamp() }
+    };
+}
+
+function settingsOp(settings) {
+    return {
+        settings: true,
+        ref: settingsRef(),
+        data: { data: settings, updatedAt: fb.serverTimestamp() }
     };
 }
 
@@ -232,7 +323,6 @@ function deleteOp(name, id) {
  * 端末のデータと「前回同期した状態」を比べて、変わった分だけ送る
  */
 function pushLocalDiff(key) {
-    const name = COLLECTIONS[key];
     const arr = readLocalArray(key);
     const prev = state.synced[key] || {};
     const next = {};
@@ -242,10 +332,10 @@ function pushLocalDiff(key) {
         if (!item || !item.id) continue;
         const h = hashOf(item);
         next[item.id] = h;
-        if (prev[item.id] !== h) ops.push(upsertOp(name, item));
+        if (prev[item.id] !== h) ops.push(upsertOp(key, item));
     }
     for (const id of Object.keys(prev)) {
-        if (!(id in next)) ops.push(deleteOp(name, id));
+        if (!(id in next)) ops.push(deleteOp(key, id));
     }
 
     state.synced[key] = next;
@@ -260,15 +350,52 @@ function pushSettingsDiff() {
     if (state.settingsHash === h) return;
     state.settingsHash = h;
     saveState();
-    commitOps([{
-        ref: settingsRef(),
-        data: { data: settings, updatedAt: fb.serverTimestamp() }
-    }]);
+    commitOps([settingsOp(settings)]);
+}
+
+/**
+ * 失敗したら少し待って自動で再送する（最大 MAX_RETRIES 回）
+ * 同じタイミングで複数のバッチが失敗しても、予約は1つだけにする
+ */
+function scheduleRetry() {
+    if (retryTimer) return;
+    if (retryAttempt >= MAX_RETRIES) {
+        // 3回だめだったら諦めて、次の変更（またはアプリの再起動）を待つ
+        gaveUp = true;
+        return;
+    }
+    retryAttempt++;
+    retryTimer = setTimeout(() => {
+        retryTimer = null;
+        retryUnsynced();
+    }, RETRY_DELAYS[retryAttempt - 1]);
+}
+
+function cancelRetry() {
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = null;
+    retryAttempt = 0;
+    gaveUp = false;
+}
+
+/** 送れなかった分を含め、すべての差分を送り直す */
+function retryUnsynced() {
+    if (!currentUser || !ready) return;
+    needsRetry = false;
+    for (const key of Object.keys(COLLECTIONS)) pushLocalDiff(key);
+    pushSettingsDiff();
 }
 
 /** app.js からの「保存したよ」通知 */
 function onLocalChange(e) {
     if (!currentUser || !ready) return;
+    if (needsRetry) {
+        // 3回の自動再送が終わっていたら、ここから新しく3回分やり直す
+        if (gaveUp) cancelRetry();
+        // 前に失敗した書き込みがあるなら、今回の変更と一緒に全部送り直す
+        retryUnsynced();
+        return;
+    }
     const key = e.detail && e.detail.key;
     if (key === SETTINGS_KEY) {
         pushSettingsDiff();
@@ -335,7 +462,9 @@ function applyRemoteChanges(key, name, snap) {
         writeLocalArray(key, result);
         refreshViews();
     }
-    updateSyncedStatus();
+    // サーバーから届いた（キャッシュではない）データなら「同期できた」とみなす
+    if (!(snap.metadata && snap.metadata.fromCache)) lastSyncedAt = new Date();
+    renderStatus();
 }
 
 function applyRemoteSettings(snap) {
@@ -364,10 +493,7 @@ function startListeners() {
         unsubscribers.push(fb.onSnapshot(
             q,
             (snap) => applyRemoteChanges(key, name, snap),
-            (e) => {
-                console.error('Sync listen error:', e);
-                setStatus('同期に失敗しました：' + (e.code || e.message), 'error');
-            }
+            reportError
         ));
     }
 
@@ -428,7 +554,7 @@ async function firstMerge() {
             const r = remote.get(item.id);
             if (!r) {
                 merged.push(item);                // 端末にしかない → アップロード
-                ops.push(upsertOp(name, item));
+                ops.push(upsertOp(key, item));
             } else if (!r.deleted && r.data) {
                 merged.push(r.data);              // 両方にある → クラウド優先
             }
@@ -452,7 +578,7 @@ async function firstMerge() {
     } else {
         const local = readLocalSettings();
         if (local) {
-            ops.push({ ref: settingsRef(), data: { data: local, updatedAt: fb.serverTimestamp() } });
+            ops.push(settingsOp(local));
             newState.settingsHash = hashOf(local);
         }
     }
@@ -467,8 +593,9 @@ async function startSync(user) {
     if (startingFor === user.uid) return;
     startingFor = user.uid;
     ready = false;
+    lastError = null;
+    cancelRetry();
     renderAccountUI();
-    setStatus(`${user.email || 'Googleアカウント'} でログイン中\n同期の準備中…`);
 
     try {
         const saved = loadState();
@@ -483,21 +610,24 @@ async function startSync(user) {
             pushSettingsDiff();
         }
         ready = true;
+        if (pendingWrites === 0) lastSyncedAt = new Date();
         startListeners();
-        updateSyncedStatus();
+        renderStatus();
     } catch (e) {
-        console.error('Sync start error:', e);
         startingFor = null;
-        if (!navigator.onLine) {
-            setStatus('初回の同期にはインターネット接続が必要です。つながったら自動で再開します', 'warn');
+        if (navigator.onLine) {
+            reportError(e);
         } else {
-            setStatus('同期を開始できませんでした：' + (e.code || e.message), 'error');
+            console.warn('Sync start postponed (offline):', e);
+            renderStatus(); // 「つながったら自動で再開します」と表示
         }
     }
 }
 
 function stopSync() {
     stopListeners();
+    cancelRetry();
+    lastError = null;
     ready = false;
     startingFor = null;
     // state（前回同期した状態）は残す。
@@ -584,9 +714,10 @@ async function init() {
     window.addEventListener('localdatachange', onLocalChange);
     window.addEventListener('online', () => {
         if (currentUser && !ready) startSync(currentUser);
-        updateSyncedStatus();
+        else if (needsRetry) retryUnsynced();
+        renderStatus();
     });
-    window.addEventListener('offline', updateSyncedStatus);
+    window.addEventListener('offline', renderStatus);
 
     // スマホでのログインから戻ってきたときの結果を受け取る
     fb.getRedirectResult(auth).catch((e) => {

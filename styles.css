@@ -123,6 +123,56 @@ body {
     flex-shrink: 0;
 }
 
+/* ヘッダーの同期ランプ（ログイン中だけ表示） */
+.sync-indicator {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 106;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 4px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-family: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.sync-indicator[hidden] {
+    display: none;
+}
+
+.sync-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.sync-indicator.synced .sync-dot { background-color: var(--color-today); }
+.sync-indicator.syncing .sync-dot {
+    background-color: var(--color-warning);
+    animation: syncPulse 1.2s ease-in-out infinite;
+}
+.sync-indicator.error .sync-dot { background-color: var(--color-overdue); }
+.sync-indicator.error { color: var(--color-overdue); }
+
+@keyframes syncPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* 画面が狭いときはランプだけにする */
+@media (max-width: 340px) {
+    .sync-label { display: none; }
+}
+
 /* ========================================
    サイドバー（ハンバーガーメニュー）
 ======================================== */

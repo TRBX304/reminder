@@ -465,7 +465,7 @@ function renderDashboardTodos() {
     listEl.innerHTML = incompleteTodos.map(todo => `
         <div class="dashboard-todo-item ${todo.completed ? 'completed' : ''}">
             <div class="todo-checkbox ${todo.completed ? 'checked' : ''}" 
-                 onclick="toggleTodo('${todo.id}')"></div>
+                 data-action="toggle-todo" data-id="${escapeHtml(todo.id)}"></div>
             <span class="dashboard-todo-text">${escapeHtml(todo.text)}</span>
         </div>
     `).join('');
@@ -477,10 +477,14 @@ function renderDashboardTodos() {
  * @returns {string} エスケープ済み文字列
  */
 function escapeHtml(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+    if (str === null || str === undefined) return '';
+    // 属性値（data-id="..."）に入れても安全なように、引用符もエスケープする
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 // ========================================
@@ -616,8 +620,8 @@ function updateSelectedDateInfo(dateStr) {
                         ${memoHtml}
                     </div>
                     <div class="date-schedule-actions">
-                        <button class="action-btn edit small" onclick="editSchedule('${s.id}')">編集</button>
-                        <button class="action-btn delete small" onclick="deleteScheduleConfirm('${s.id}')">削除</button>
+                        <button class="action-btn edit small" data-action="edit-schedule" data-id="${escapeHtml(s.id)}">編集</button>
+                        <button class="action-btn delete small" data-action="delete-schedule" data-id="${escapeHtml(s.id)}">削除</button>
                     </div>
                 </div>
             `;
@@ -682,13 +686,13 @@ function renderRoutineList() {
                 <div class="routine-top">
                     <span class="routine-title">${escapeHtml(routine.title)}</span>
                     <button class="routine-toggle ${routine.enabled ? 'active' : ''}" 
-                            onclick="toggleRoutine('${routine.id}')" 
+                            data-action="toggle-routine" data-id="${escapeHtml(routine.id)}" 
                             aria-label="ルーティーンの有効/無効を切り替え"></button>
                 </div>
                 <div class="routine-info">${frequencyText}</div>
                 <div class="routine-actions">
-                    <button class="action-btn edit" onclick="editRoutine('${routine.id}')">編集</button>
-                    <button class="action-btn delete" onclick="deleteRoutineConfirm('${routine.id}')">削除</button>
+                    <button class="action-btn edit" data-action="edit-routine" data-id="${escapeHtml(routine.id)}">編集</button>
+                    <button class="action-btn delete" data-action="delete-routine" data-id="${escapeHtml(routine.id)}">削除</button>
                 </div>
             </div>
         `;
@@ -728,7 +732,7 @@ function renderTodayRoutines() {
         return `
             <div class="today-routine-item ${isChecked ? 'completed' : ''}">
                 <div class="routine-checkbox ${isChecked ? 'checked' : ''}" 
-                     onclick="toggleRoutineCheck('${routine.id}')"></div>
+                     data-action="toggle-routine-check" data-id="${escapeHtml(routine.id)}"></div>
                 <span class="routine-check-title">${escapeHtml(routine.title)}</span>
             </div>
         `;
@@ -799,9 +803,9 @@ function renderTodoList() {
     listEl.innerHTML = sortedTodos.map(todo => `
         <div class="todo-item ${todo.completed ? 'completed' : ''}">
             <div class="todo-checkbox ${todo.completed ? 'checked' : ''}" 
-                 onclick="toggleTodo('${todo.id}')"></div>
+                 data-action="toggle-todo" data-id="${escapeHtml(todo.id)}"></div>
             <span class="todo-text">${escapeHtml(todo.text)}</span>
-            <button class="todo-delete" onclick="deleteTodo('${todo.id}')">削除</button>
+            <button class="todo-delete" data-action="delete-todo" data-id="${escapeHtml(todo.id)}">削除</button>
         </div>
     `).join('');
 }
@@ -883,17 +887,17 @@ function renderMemoList() {
     
     listEl.innerHTML = sortedMemos.map(memo => {
         const date = new Date(memo.updatedAt);
-        const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+        const dateStr = `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
         const preview = memo.content ? memo.content.substring(0, 100) : '（内容なし）';
         
         return `
-            <div class="memo-card" onclick="openMemoModal('${memo.id}')">
+            <div class="memo-card" data-action="open-memo" data-id="${escapeHtml(memo.id)}">
                 <div class="memo-card-title">${escapeHtml(memo.title)}</div>
                 <div class="memo-card-preview">${escapeHtml(preview)}</div>
                 <div class="memo-card-date">${dateStr}</div>
-                <div class="memo-card-actions" onclick="event.stopPropagation()">
-                    <button class="action-btn edit" onclick="openMemoModal('${memo.id}')">編集</button>
-                    <button class="action-btn delete" onclick="deleteMemoConfirm('${memo.id}')">削除</button>
+                <div class="memo-card-actions">
+                    <button class="action-btn edit" data-action="open-memo" data-id="${escapeHtml(memo.id)}">編集</button>
+                    <button class="action-btn delete" data-action="delete-memo" data-id="${escapeHtml(memo.id)}">削除</button>
                 </div>
             </div>
         `;
@@ -1113,7 +1117,7 @@ function openRoutineModal(editId = null) {
             if (routine.frequency === 'weekly') {
                 document.getElementById('weekdayGroup').style.display = 'block';
                 routine.weekdays.forEach(day => {
-                    const cb = document.querySelector(`#weekdayGroup input[value="${day}"]`);
+                    const cb = document.querySelector(`#weekdayGroup input[value="${Number(day)}"]`);
                     if (cb) cb.checked = true;
                 });
             }
@@ -1252,6 +1256,15 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(err => console.error('Service Worker registration failed:', err));
     }
     
+    // 一覧のボタン操作（data-action を持つ要素のクリックをまとめて受け取る）
+    // HTMLに onclick="..." を埋め込まないことで、データ由来の文字列がコードとして実行されるのを防ぐ
+    document.addEventListener('click', handleActionClick);
+
+    // ヘッダーの同期ランプを押したら設定画面へ
+    document.getElementById('syncIndicator').addEventListener('click', () => {
+        document.querySelector('.nav-item[data-view="settings"]').click();
+    });
+
     // 初期表示
     updateDashboard();
     renderCalendar();
@@ -1380,6 +1393,31 @@ document.addEventListener('DOMContentLoaded', () => {
     importFileInput.addEventListener('change', importFromFile);
 });
 
+/**
+ * data-action を持つ要素のクリックを処理
+ * @param {MouseEvent} e
+ */
+function handleActionClick(e) {
+    const el = e.target.closest('[data-action]');
+    if (!el) return;
+
+    const id = el.dataset.id;
+    const actions = {
+        'toggle-todo': toggleTodo,
+        'delete-todo': deleteTodo,
+        'edit-schedule': editSchedule,
+        'delete-schedule': deleteScheduleConfirm,
+        'toggle-routine': toggleRoutine,
+        'edit-routine': editRoutine,
+        'delete-routine': deleteRoutineConfirm,
+        'toggle-routine-check': toggleRoutineCheck,
+        'open-memo': openMemoModal,
+        'delete-memo': deleteMemoConfirm
+    };
+    const fn = actions[el.dataset.action];
+    if (fn) fn(id);
+}
+
 // ========================================
 // 9. 設定・バックアップ機能
 // ========================================
@@ -1490,6 +1528,18 @@ function restoreFromJson(jsonStr) {
             alert('バックアップデータが壊れています');
             return false;
         }
+    }
+
+    // IDが想定外の形（記号入りなど）なら振り直す
+    // 同期のときにFirestoreのドキュメント名としても使うため、英数字と _ - だけにしておく
+    for (const key of arrayKeys) {
+        if (!Array.isArray(data[key])) continue;
+        data[key] = data[key].filter(item => item && typeof item === 'object');
+        data[key].forEach(item => {
+            if (typeof item.id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(item.id)) {
+                item.id = generateId();
+            }
+        });
     }
 
     const count = (arr) => (Array.isArray(arr) ? arr.length : 0);

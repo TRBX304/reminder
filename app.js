@@ -62,8 +62,35 @@ function loadFromStorage(key) {
 function saveToStorage(key, data) {
     try {
         localStorage.setItem(key, JSON.stringify(data));
+        notifyLocalChange(key);
     } catch (e) {
         console.error('Storage save error:', e);
+    }
+}
+
+/**
+ * データを保存したことを知らせる（ログイン中なら sync.js がクラウドへ送る）
+ * @param {string} key - ストレージキー
+ */
+function notifyLocalChange(key) {
+    window.dispatchEvent(new CustomEvent('localdatachange', { detail: { key } }));
+}
+
+/**
+ * すべての画面を最新のデータで描き直す
+ * （バックアップの復元や、他の端末からの同期のあとに呼ぶ）
+ */
+function refreshAllViews() {
+    updateDashboard();
+    renderCalendar();
+    renderRoutineList();
+    renderTodoList();
+    renderMemoList();
+    if (selectedDate) {
+        updateSelectedDateInfo(selectedDate);
+    }
+    if (document.getElementById('settingsView').classList.contains('active')) {
+        loadSettingsUI();
     }
 }
 
@@ -190,6 +217,7 @@ function getSettings() {
 function saveSettings(settings) {
     try {
         localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+        notifyLocalChange(STORAGE_KEYS.SETTINGS);
     } catch (e) {
         console.error('Settings save error:', e);
     }
@@ -1344,6 +1372,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('exportBtn').addEventListener('click', exportData);
     document.getElementById('copyExportBtn').addEventListener('click', copyExportData);
     document.getElementById('importBtn').addEventListener('click', importData);
+
+    // ファイルでのバックアップ
+    const importFileInput = document.getElementById('importFileInput');
+    document.getElementById('exportFileBtn').addEventListener('click', exportToFile);
+    document.getElementById('importFileBtn').addEventListener('click', () => importFileInput.click());
+    importFileInput.addEventListener('change', importFromFile);
 });
 
 // ========================================
@@ -1376,17 +1410,7 @@ function saveSettingsFromUI() {
  * データをエクスポート
  */
 function exportData() {
-    const data = {
-        version: 1,
-        exportedAt: new Date().toISOString(),
-        schedules: getSchedules(),
-        routines: getRoutines(),
-        todos: getTodos(),
-        memos: getMemos(),
-        settings: getSettings()
-    };
-    
-    const jsonStr = JSON.stringify(data, null, 2);
+    const jsonStr = JSON.stringify(buildBackupData(), null, 2);
     const textarea = document.getElementById('exportData');
     textarea.value = jsonStr;
     document.getElementById('copyExportBtn').style.display = 'block';
@@ -1413,43 +1437,142 @@ function copyExportData() {
 function importData() {
     const textarea = document.getElementById('importData');
     const jsonStr = textarea.value.trim();
-    
+
     if (!jsonStr) {
         alert('データを貼り付けてください');
         return;
     }
-    
-    try {
-        const data = JSON.parse(jsonStr);
-        
-        if (!data.version) {
-            alert('無効なバックアップデータです');
-            return;
-        }
-        
-        if (!confirm('現在のデータを上書きしますか？')) {
-            return;
-        }
-        
-        // データを復元
-        if (data.schedules) saveSchedules(data.schedules);
-        if (data.routines) saveRoutines(data.routines);
-        if (data.todos) saveTodos(data.todos);
-        if (data.memos) saveMemos(data.memos);
-        if (data.settings) saveSettings(data.settings);
-        
-        // 画面を更新
-        updateDashboard();
-        renderCalendar();
-        renderRoutineList();
-        renderTodoList();
-        renderMemoList();
-        loadSettingsUI();
-        
+
+    if (restoreFromJson(jsonStr)) {
         textarea.value = '';
-        alert('データを復元しました');
-        
+    }
+}
+
+/**
+ * バックアップ用のデータを組み立てる
+ * @returns {object}
+ */
+function buildBackupData() {
+    return {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        schedules: getSchedules(),
+        routines: getRoutines(),
+        todos: getTodos(),
+        memos: getMemos(),
+        settings: getSettings()
+    };
+}
+
+/**
+ * JSON文字列からデータを復元（テキスト・ファイル共通）
+ * @param {string} jsonStr
+ * @returns {boolean} 復元したらtrue
+ */
+function restoreFromJson(jsonStr) {
+    let data;
+    try {
+        data = JSON.parse(jsonStr);
     } catch (e) {
         alert('データの形式が正しくありません');
+        return false;
+    }
+
+    if (!data || typeof data !== 'object' || !data.version) {
+        alert('無効なバックアップデータです');
+        return false;
+    }
+
+    // 配列であるべき項目が壊れていないか確認
+    const arrayKeys = ['schedules', 'routines', 'todos', 'memos'];
+    for (const key of arrayKeys) {
+        if (data[key] !== undefined && !Array.isArray(data[key])) {
+            alert('バックアップデータが壊れています');
+            return false;
+        }
+    }
+
+    const count = (arr) => (Array.isArray(arr) ? arr.length : 0);
+    const dateText = data.exportedAt
+        ? new Date(data.exportedAt).toLocaleString('ja-JP')
+        : '不明';
+    const message =
+        `このバックアップで現在のデータを上書きしますか？\n\n` +
+        `保存日時: ${dateText}\n` +
+        `予定: ${count(data.schedules)}件 / ルーティーン: ${count(data.routines)}件\n` +
+        `TODO: ${count(data.todos)}件 / メモ: ${count(data.memos)}件`;
+
+    if (!confirm(message)) {
+        return false;
+    }
+
+    // データを復元
+    if (data.schedules) saveSchedules(data.schedules);
+    if (data.routines) saveRoutines(data.routines);
+    if (data.todos) saveTodos(data.todos);
+    if (data.memos) saveMemos(data.memos);
+    if (data.settings) saveSettings(data.settings);
+
+    // 画面を更新
+    refreshAllViews();
+    loadSettingsUI();
+
+    alert('データを復元しました');
+    return true;
+}
+
+/**
+ * データを.jsonファイルとして保存
+ * スマホで共有シートが使える場合はそちらを使い、使えなければダウンロードする
+ */
+async function exportToFile() {
+    const jsonStr = JSON.stringify(buildBackupData(), null, 2);
+    const fileName = `reminder-backup-${getTodayString()}.json`;
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+
+    // スマホ：共有シート（「ファイルに保存」やGoogleドライブなどを選べる）
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile && navigator.canShare) {
+        const file = new File([blob], fileName, { type: 'application/json' });
+        if (navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({ files: [file], title: fileName });
+                return;
+            } catch (e) {
+                // ユーザーが閉じた場合は何もしない
+                if (e.name === 'AbortError') return;
+                // それ以外の失敗はダウンロードに切り替える
+            }
+        }
+    }
+
+    // PC・共有できない環境：ダウンロード
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/**
+ * 選んだ.jsonファイルからデータを復元
+ * @param {Event} e - inputのchangeイベント
+ */
+async function importFromFile(e) {
+    const input = e.target;
+    const file = input.files && input.files[0];
+    if (!file) return;
+
+    try {
+        const text = await file.text();
+        restoreFromJson(text);
+    } catch (err) {
+        alert('ファイルを読み込めませんでした');
+    } finally {
+        // 同じファイルをもう一度選べるようにリセット
+        input.value = '';
     }
 }

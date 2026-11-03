@@ -1471,7 +1471,42 @@ body {
     cursor: pointer;
 }
 
+/* アカウント同期 */
+.sync-status {
+    padding: 12px;
+    margin-bottom: 12px;
+    background-color: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--text-muted);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    white-space: pre-line;
+}
+
+.sync-status.ok { border-left-color: var(--color-today); }
+.sync-status.warn { border-left-color: var(--color-warning); }
+.sync-status.error { border-left-color: var(--color-overdue); color: var(--color-overdue); }
+
+.sync-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: var(--radius-sm);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-save.sync-btn {
+    border: none;
+}
+
 #saveSettings {
     width: 100%;
     margin-top: 8px;
+    padding: 14px;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
 }

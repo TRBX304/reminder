@@ -213,11 +213,33 @@
                 <button class="btn-save" id="saveSettings">設定を保存</button>
             </div>
             
+            <div class="settings-section" id="syncSection">
+                <h2>アカウント同期</h2>
+                <p class="setting-desc">Googleアカウントでログインすると、スマホやPCの間でデータを同期できます。ログインしなくても今までどおり使えます。</p>
+                <p class="setting-desc">はじめてログインしたときは、この端末のデータとクラウドのデータを合体させます。この端末のデータは消えません。</p>
+                <div class="sync-status" id="syncStatus">同期機能を読み込み中…</div>
+                <button class="btn-save sync-btn" id="syncLoginBtn" style="display: none;">Googleでログインして同期</button>
+                <button class="btn-backup sync-btn" id="syncLogoutBtn" style="display: none;">ログアウト</button>
+            </div>
+
             <div class="settings-section">
                 <h2>バックアップ</h2>
-                
+
                 <div class="backup-group">
-                    <h3>エクスポート（書き出し）</h3>
+                    <h3>ファイルで保存（おすすめ）</h3>
+                    <p class="setting-desc">全データを .json ファイルとして保存します。</p>
+                    <button class="btn-copy" id="exportFileBtn">ファイルに保存する</button>
+                </div>
+
+                <div class="backup-group">
+                    <h3>ファイルから復元</h3>
+                    <p class="setting-desc">保存した .json ファイルを選ぶと、データを復元します。</p>
+                    <input type="file" id="importFileInput" accept=".json,application/json" style="display: none;">
+                    <button class="btn-backup" id="importFileBtn">ファイルを選んで復元</button>
+                </div>
+
+                <div class="backup-group">
+                    <h3>エクスポート（テキストで書き出し）</h3>
                     <p class="setting-desc">下のボタンを押すとデータがテキストで表示されます。コピーして保存してください。</p>
                     <button class="btn-backup" id="exportBtn">データを書き出す</button>
                     <textarea id="exportData" class="backup-textarea" readonly placeholder="ここにデータが表示されます"></textarea>
@@ -225,7 +247,7 @@
                 </div>
                 
                 <div class="backup-group">
-                    <h3>インポート（読み込み）</h3>
+                    <h3>インポート（テキストから読み込み）</h3>
                     <p class="setting-desc">バックアップしたテキストを貼り付けて、読み込みボタンを押してください。</p>
                     <textarea id="importData" class="backup-textarea" placeholder="ここにバックアップデータを貼り付け"></textarea>
                     <button class="btn-backup" id="importBtn">データを読み込む</button>
@@ -242,7 +264,7 @@
                 <p>大会・試験・課題などの締め切りを、大きく見やすく表示することに特化しています。</p>
                 <div class="about-badge">
                     <span>🔒</span>
-                    <span>データは端末内に保存され、サーバーへ送信されません</span>
+                    <span>データは端末内に保存されます。設定でGoogleアカウントにログインして同期をオンにした場合のみ、クラウド（Google Firebase）にも保存されます</span>
                 </div>
             </div>
 
@@ -411,5 +433,6 @@
 
     <script src="holidays.js"></script>
     <script src="app.js"></script>
+    <script type="module" src="sync.js"></script>
 </body>
 </html>
